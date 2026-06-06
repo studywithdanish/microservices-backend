@@ -4,23 +4,21 @@ import com.danish.blog.entities.Role;
 import com.danish.blog.payloads.AppConstants;
 import com.danish.blog.repositories.RoleRepo;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 
 @SpringBootApplication
 public class BlogAppApisApplication implements CommandLineRunner {
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final RoleRepo roleRepo;
 
-    @Autowired
-    private RoleRepo roleRepo;
+    public BlogAppApisApplication(RoleRepo roleRepo) {
+        this.roleRepo = roleRepo;
+    }
 
     public static void main(String[] args) {
 
@@ -35,8 +33,7 @@ public class BlogAppApisApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println(passwordEncoder.encode("danish"));
-        try{
+        if (roleRepo.count() == 0) {
             Role role1 = new Role();
             role1.setId(AppConstants.ADMIN_USER);
             role1.setName("ROLE_ADMIN");
@@ -46,14 +43,7 @@ public class BlogAppApisApplication implements CommandLineRunner {
             role2.setName("ROLE_NORMAL");
 
             List<Role> roles = List.of(role1, role2);
-            List<Role> result = roleRepo.saveAll(roles);
-            result.forEach(
-                    r-> {
-                        System.out.println(r.getName());
-                    }
-            );
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            roleRepo.saveAll(roles);
         }
     }
 }
