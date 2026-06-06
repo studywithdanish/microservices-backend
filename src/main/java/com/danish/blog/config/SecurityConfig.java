@@ -4,6 +4,7 @@ import com.danish.blog.security.CustomUserDetailService;
 import com.danish.blog.security.JwtAuthenticationEntryPoint;
 import com.danish.blog.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,7 +39,16 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
             "/v2/api-docs",
             "/swagger-resources/**",
             "/swagger-ui",
+            "/swagger-ui/**",
             "/webjars/**"
+    };
+
+    public static final String[] PUBLIC_GET_URLS = {
+            "/api/posts",
+            "/api/post/**",
+            "/api/posts/search/**",
+            "/api/category/**",
+            "/api/categories/**"
     };
 
     @Autowired
@@ -49,6 +59,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
 
 
 
@@ -61,7 +74,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 /*.antMatchers("/api/v1/auth/**").permitAll()
                 .antMatchers("/v3/api-docs").permitAll()*/
                 .antMatchers(PUBLIC_URLS).permitAll()
-                .antMatchers(HttpMethod.GET).permitAll()
+                .antMatchers(HttpMethod.GET, PUBLIC_GET_URLS).permitAll()
                 .anyRequest()
                 .authenticated()
                 .and()
@@ -95,7 +108,9 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration corsConfiguration = new CorsConfiguration();
         corsConfiguration.setAllowCredentials(true);
-        corsConfiguration.addAllowedOriginPattern("*");
+        for (String origin : allowedOrigins.split(",")) {
+            corsConfiguration.addAllowedOrigin(origin.trim());
+        }
         corsConfiguration.addAllowedHeader("Authorization");
         corsConfiguration.addAllowedHeader("Content-Type");
         corsConfiguration.addAllowedHeader("Accept");

@@ -3,9 +3,9 @@ package com.danish.blog.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -15,9 +15,11 @@ import java.util.function.Function;
 @Component
 public class JwtTokenHelper {
 
-    public static final long JWT_TOKEN_VALIDITY = 5*60*60;
+    @Value("${app.jwt.expiration-ms}")
+    private long jwtExpirationMs;
 
-    private String secret = "jwtTokenKey";
+    @Value("${app.jwt.secret}")
+    private String secret;
 
     //Retrieve username from token
     public String getUsernameFromToken(String token){
@@ -59,7 +61,7 @@ public class JwtTokenHelper {
    */
     private String doGenerateToken(Map<String, Object> claims, String subject){
         return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY *100))
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(SignatureAlgorithm.HS512, secret).compact();
     }
 
