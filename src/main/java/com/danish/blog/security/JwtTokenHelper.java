@@ -2,11 +2,13 @@ package com.danish.blog.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,7 +40,7 @@ public class JwtTokenHelper {
 
     //For retrieving any information from the token we will need the secret key
     private Claims getAllClaimsFromToken(String token){
-        return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+        return Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
     }
 
     //Check if the token has expired
@@ -58,16 +60,20 @@ public class JwtTokenHelper {
     2. Sign the Jwt Using the HS512 algorithm and secret key
     3. According to JMS Compact Serialization (http://tools.ietf.org/html/draft-ietf-jose-j)
     compaction of the Jwt to a URL-safe String
-   */
+    */
     private String doGenerateToken(Map<String, Object> claims, String subject){
-        return Jwts.builder().setClaims(claims).setSubject(subject).setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(SignatureAlgorithm.HS512, secret).compact();
+        return Jwts.builder().claims(claims).subject(subject).issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(getSigningKey(), Jwts.SIG.HS512).compact();
     }
 
     //validate token
     public Boolean validateToken(String token, UserDetails userDetails){
         final String username = getUsernameFromToken(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 }

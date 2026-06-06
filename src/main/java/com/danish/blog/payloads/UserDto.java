@@ -1,6 +1,6 @@
 package com.danish.blog.payloads;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 import com.danish.blog.entities.Role;
 import lombok.Getter;
