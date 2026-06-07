@@ -1,0 +1,45 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: blog-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog_app_apis}
+      MYSQL_USER: ${DB_USERNAME:-blog_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-blog_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: blog-backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-blog_app_apis}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      DB_USERNAME: ${DB_USERNAME:-blog_user}
+      DB_PASSWORD: ${DB_PASSWORD:-blog_password}
+      JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-before-production-change-this-dev-secret-before-production}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-18000000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+    ports:
+      - "${BACKEND_PORT:-9090}:9090"
+    volumes:
+      - uploaded_images:/app/images
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  uploaded_images:
