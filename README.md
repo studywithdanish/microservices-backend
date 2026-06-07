@@ -59,6 +59,26 @@ mvn test
 
 Tests use an isolated H2 database profile and do not require local MySQL.
 
+## Jenkins Pipeline
+
+This repository includes a `Jenkinsfile` for a basic CI pipeline.
+
+Pipeline stages:
+
+- Checkout source code
+- Verify Java and Maven versions
+- Run Maven tests
+- Publish JUnit test reports
+- Package the Spring Boot application
+- Archive the generated JAR artifact
+
+Expected Jenkins tool names:
+
+- JDK: `jdk17`
+- Maven: `maven3`
+
+Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
+
 ## Environment Variables
 
 Use `.env.example` as the reference for local development. Do not commit `.env`.
