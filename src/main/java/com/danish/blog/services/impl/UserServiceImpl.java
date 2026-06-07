@@ -8,6 +8,8 @@ import com.danish.blog.payloads.UserDto;
 import com.danish.blog.repositories.RoleRepo;
 import com.danish.blog.repositories.UserRepo;
 import com.danish.blog.services.UserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,6 +23,8 @@ import static com.danish.blog.payloads.UserDto.*;
 
 @Service
 public class UserServiceImpl implements UserService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
     @Autowired
     private UserRepo userRepo;
@@ -72,7 +76,7 @@ public class UserServiceImpl implements UserService {
     public UserDto getUserById(Integer userId) {
 
         User user = this.userRepo.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", "ID", userId));
-        System.out.println("user.getName()" + user.getName());
+        logger.debug("Fetched user by id: {}", userId);
         return this.userToDto(user);
     }
 
