@@ -42,7 +42,9 @@ public class SecurityConfig {
             "/swagger-ui",
             "/swagger-ui.html",
             "/swagger-ui/**",
-            "/webjars/**"
+            "/webjars/**",
+            "/actuator/health",
+            "/actuator/info"
     };
 
     public static final String[] PUBLIC_GET_URLS = {
