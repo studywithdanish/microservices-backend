@@ -47,6 +47,12 @@ http://localhost:9090/actuator/health
 http://localhost:9090/actuator/info
 ```
 
+Check container health status:
+
+```bash
+docker compose ps
+```
+
 Stop the stack:
 
 ```bash
