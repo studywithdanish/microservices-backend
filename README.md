@@ -84,12 +84,22 @@ Pipeline stages:
 - Run Maven tests
 - Publish JUnit test reports
 - Package the Spring Boot application
+- Build the Docker image
 - Archive the generated JAR artifact
 
 Expected Jenkins tool names:
 
 - JDK: `jdk17`
 - Maven: `maven3`
+
+The Jenkins agent must also have Docker installed and permission to run Docker commands.
+
+Docker images are tagged as:
+
+```text
+blog-app-apis:<jenkins-build-number>
+blog-app-apis:latest
+```
 
 Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
 

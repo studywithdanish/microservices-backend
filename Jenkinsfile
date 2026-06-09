@@ -14,6 +14,8 @@ pipeline {
 
     environment {
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
+        DOCKER_IMAGE_NAME = 'blog-app-apis'
+        DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -49,6 +51,15 @@ pipeline {
             steps {
                 script {
                     runCommand('mvn package -DskipTests')
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    runCommand('docker --version')
+                    runCommand("docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${DOCKER_IMAGE_NAME}:latest .")
                 }
             }
         }
