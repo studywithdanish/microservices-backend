@@ -8,7 +8,6 @@ import com.danish.blog.security.JwtTokenHelper;
 import com.danish.blog.services.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -29,17 +28,22 @@ public class AuthController {
 
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
-    @Autowired
-    private JwtTokenHelper jwtTokenHelper;
+    private final JwtTokenHelper jwtTokenHelper;
+    private final UserDetailsService userDetailsService;
+    private final AuthenticationManager authenticationManager;
+    private final UserService userService;
 
-    @Autowired
-    private UserDetailsService userDetailsService;
-
-    @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserService userService;
+    public AuthController(
+            JwtTokenHelper jwtTokenHelper,
+            UserDetailsService userDetailsService,
+            AuthenticationManager authenticationManager,
+            UserService userService
+    ) {
+        this.jwtTokenHelper = jwtTokenHelper;
+        this.userDetailsService = userDetailsService;
+        this.authenticationManager = authenticationManager;
+        this.userService = userService;
+    }
 
     @PostMapping("/login")
     public ResponseEntity<JwtAuthResponse> createToken(

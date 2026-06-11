@@ -1,14 +1,11 @@
 package com.danish.blog.controllers;
 
-import com.danish.blog.entities.Post;
 import com.danish.blog.payloads.ApiResponse;
 import com.danish.blog.payloads.AppConstants;
 import com.danish.blog.payloads.PostDto;
 import com.danish.blog.payloads.PostResponse;
 import com.danish.blog.services.FileService;
 import com.danish.blog.services.PostService;
-import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,23 +18,21 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
 public class PostController {
 
-    @Autowired
-    private PostService postService;
-
-    @Autowired
-    private ModelMapper modelMapper;
-
-    @Autowired
-    private FileService fileService;
+    private final PostService postService;
+    private final FileService fileService;
 
     @Value("${project.image}")
     private String path;
+
+    public PostController(PostService postService, FileService fileService) {
+        this.postService = postService;
+        this.fileService = fileService;
+    }
 
     @PostMapping("/user/{userId}/category/{categoryId}/posts")
     public ResponseEntity<PostDto> createPost(
