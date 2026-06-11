@@ -6,7 +6,6 @@ import com.danish.blog.payloads.CategoryDto;
 import com.danish.blog.repositories.CategoryRepo;
 import com.danish.blog.services.CategoryService;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,11 +14,13 @@ import java.util.stream.Collectors;
 @Service
 public class CategoryServiceImpl implements CategoryService {
 
-    @Autowired
-    private ModelMapper modelMapper;
+    private final ModelMapper modelMapper;
+    private final CategoryRepo categoryRepo;
 
-    @Autowired
-    private CategoryRepo categoryRepo;
+    public CategoryServiceImpl(ModelMapper modelMapper, CategoryRepo categoryRepo) {
+        this.modelMapper = modelMapper;
+        this.categoryRepo = categoryRepo;
+    }
 
     @Override
     public CategoryDto createCategory(CategoryDto categoryDto) {

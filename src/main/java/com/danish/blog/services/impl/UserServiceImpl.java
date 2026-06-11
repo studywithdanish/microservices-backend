@@ -11,7 +11,6 @@ import com.danish.blog.services.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,17 +22,17 @@ public class UserServiceImpl implements UserService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
-    @Autowired
-    private UserRepo userRepo;
+    private final UserRepo userRepo;
+    private final ModelMapper modelMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final RoleRepo roleRepo;
 
-    @Autowired
-    private ModelMapper modelMapper;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private RoleRepo roleRepo;
+    public UserServiceImpl(UserRepo userRepo, ModelMapper modelMapper, PasswordEncoder passwordEncoder, RoleRepo roleRepo) {
+        this.userRepo = userRepo;
+        this.modelMapper = modelMapper;
+        this.passwordEncoder = passwordEncoder;
+        this.roleRepo = roleRepo;
+    }
 
     @Override
     public UserDto registerUser(UserDto userDto) {

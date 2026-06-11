@@ -12,7 +12,6 @@ import com.danish.blog.repositories.PostRepo;
 import com.danish.blog.repositories.UserRepo;
 import com.danish.blog.services.PostService;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,17 +25,17 @@ import java.util.stream.Collectors;
 @Service
 public class PostServiceImpl implements PostService {
 
-    @Autowired
-    private PostRepo postRepo;
+    private final PostRepo postRepo;
+    private final ModelMapper modelMapper;
+    private final UserRepo userRepo;
+    private final CategoryRepo categoryRepo;
 
-    @Autowired
-    private ModelMapper modelMapper;
-
-    @Autowired
-    private UserRepo userRepo;
-
-    @Autowired
-    private CategoryRepo categoryRepo;
+    public PostServiceImpl(PostRepo postRepo, ModelMapper modelMapper, UserRepo userRepo, CategoryRepo categoryRepo) {
+        this.postRepo = postRepo;
+        this.modelMapper = modelMapper;
+        this.userRepo = userRepo;
+        this.categoryRepo = categoryRepo;
+    }
 
     @Override
     public PostDto createPost(PostDto postDto, Integer userId, Integer categoryId) {

@@ -8,20 +8,20 @@ import com.danish.blog.repositories.CommentRepo;
 import com.danish.blog.repositories.PostRepo;
 import com.danish.blog.services.CommentService;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CommentServiceImpl implements CommentService {
 
-    @Autowired
-    private CommentRepo commentRepo;
+    private final CommentRepo commentRepo;
+    private final PostRepo postRepo;
+    private final ModelMapper modelMapper;
 
-    @Autowired
-    private PostRepo postRepo;
-
-    @Autowired
-    private ModelMapper modelMapper;
+    public CommentServiceImpl(CommentRepo commentRepo, PostRepo postRepo, ModelMapper modelMapper) {
+        this.commentRepo = commentRepo;
+        this.postRepo = postRepo;
+        this.modelMapper = modelMapper;
+    }
 
     @Override
     public CommentDto createComment(CommentDto commentDto, Integer postId) {
