@@ -87,6 +87,46 @@ class UserServiceImplTest {
     }
 
     @Test
+    void createUserShouldEncodePasswordBeforeSaving() {
+        when(modelMapper.map(userDto, User.class)).thenReturn(user);
+        when(passwordEncoder.encode("plain123")).thenReturn("encoded-password");
+        when(userRepo.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(modelMapper.map(any(User.class), any())).thenReturn(userDto);
+
+        userService.createUser(userDto);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepo).save(userCaptor.capture());
+
+        assertThat(userCaptor.getValue().getPassword()).isEqualTo("encoded-password");
+    }
+
+    @Test
+    void updateUserShouldEncodeUpdatedPasswordBeforeSaving() {
+        UserDto updateRequest = new UserDto();
+        updateRequest.setName("Danish Khan");
+        updateRequest.setEmail("danish.khan@example.com");
+        updateRequest.setPassword("newpass");
+        updateRequest.setAbout("Updated profile");
+
+        when(userRepo.findById(1)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newpass")).thenReturn("encoded-new-password");
+        when(userRepo.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(modelMapper.map(any(User.class), any())).thenReturn(updateRequest);
+
+        userService.updateUser(updateRequest, 1);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepo).save(userCaptor.capture());
+        User savedUser = userCaptor.getValue();
+
+        assertThat(savedUser.getName()).isEqualTo("Danish Khan");
+        assertThat(savedUser.getEmail()).isEqualTo("danish.khan@example.com");
+        assertThat(savedUser.getPassword()).isEqualTo("encoded-new-password");
+        assertThat(savedUser.getAbout()).isEqualTo("Updated profile");
+    }
+
+    @Test
     void getUserByIdShouldReturnMappedUser() {
         when(userRepo.findById(1)).thenReturn(Optional.of(user));
         when(modelMapper.map(user, UserDto.class)).thenReturn(userDto);

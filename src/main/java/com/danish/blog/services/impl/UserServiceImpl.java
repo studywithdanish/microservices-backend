@@ -15,11 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static com.danish.blog.payloads.UserDto.*;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -54,6 +51,7 @@ public class UserServiceImpl implements UserService {
     public UserDto createUser(UserDto userDto) {
 
         User user = this.dtoToUser(userDto);
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
         User savedUser = this.userRepo.save(user);
         return this.userToDto(savedUser);
     }
@@ -64,7 +62,7 @@ public class UserServiceImpl implements UserService {
         User user = this.userRepo.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", "ID", userId));
         user.setName(userDto.getName());
         user.setEmail(userDto.getEmail());
-        user.setPassword(userDto.getPassword());
+        user.setPassword(passwordEncoder.encode(userDto.getPassword()));
         user.setAbout(userDto.getAbout());
 
         User updatedUser = this.userRepo.save(user);
