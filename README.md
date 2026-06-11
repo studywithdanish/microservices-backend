@@ -2,6 +2,40 @@
 
 Spring Boot backend APIs for a blogging platform. The project is being modernized from a monolithic blog API into a production-ready backend foundation for platform engineering practice.
 
+## Current Architecture
+
+The current backend is a modular Spring Boot monolith. It exposes blog, category, comment, user, authentication, Swagger/OpenAPI, and operational health endpoints from one deployable application.
+
+This is intentional for the first production baseline: the application is being stabilized with modern Spring Boot, security, tests, Docker, Jenkins, and health checks before extracting services.
+
+High-level structure:
+
+- Controllers expose REST APIs
+- Services contain business logic
+- Repositories handle persistence through Spring Data JPA
+- Spring Security protects write/admin operations with JWT-based authentication
+- MySQL is used for local/prod-style runtime, while tests use an isolated H2 profile
+- Docker Compose runs the backend with MySQL for local platform testing
+
+## Engineering Improvements
+
+This repository is being upgraded step by step with a commit history that shows the modernization journey.
+
+Completed improvements:
+
+- Upgraded to Spring Boot 3 and Spring Security 6
+- Replaced legacy Swagger setup with springdoc OpenAPI
+- Externalized environment-specific configuration
+- Removed secrets from current application configuration
+- Added Dockerfile and Docker Compose runtime
+- Added Jenkins CI pipeline with Maven test/package and Docker image build stages
+- Added Actuator health and info endpoints
+- Added Docker healthcheck using `/actuator/health`
+- Added service, controller, and security access tests
+- Replaced console output with structured SLF4J logging
+- Encoded passwords consistently across user mutation flows
+- Refactored services and controllers to constructor injection
+
 ## Tech Stack
 
 - Java 17
@@ -13,6 +47,8 @@ Spring Boot backend APIs for a blogging platform. The project is being modernize
 - springdoc OpenAPI
 - Spring Boot Actuator
 - Docker and Docker Compose
+- Jenkins
+- JUnit 5, Mockito, MockMvc, Spring Security Test
 
 ## Run Locally With Docker
 
@@ -135,3 +171,37 @@ Spring Boot Actuator exposes only safe public endpoints by default:
 ```
 
 These endpoints are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations.
+
+## Deployment Roadmap
+
+The planned deployment path is incremental and cost-aware:
+
+1. Deploy the current Dockerized monolith as the first stable AWS baseline.
+2. Store runtime configuration as environment variables.
+3. Add a Docker image registry push stage in Jenkins.
+4. Deploy the backend container on a low-cost AWS option.
+5. Add Terraform for repeatable infrastructure.
+6. Add centralized logs and basic metrics.
+7. Add Prometheus and Grafana after the live deployment is stable.
+
+## Microservices Migration Roadmap
+
+The monolith will be split only after the production baseline is stable.
+
+Planned service boundaries:
+
+- API Gateway
+- Auth/User service
+- Post service
+- Category/Comment service
+
+Migration strategy:
+
+1. Keep the current monolith live as the stable baseline.
+2. Extract one bounded context at a time.
+3. Containerize each extracted service independently.
+4. Add service-to-service communication only where needed.
+5. Move toward independent CI/CD pipelines per service.
+6. Add Kubernetes after Docker, Jenkins, AWS, Terraform, and monitoring are already understood.
+
+This avoids premature complexity and shows an incremental migration approach suitable for real production systems.
