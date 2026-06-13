@@ -31,6 +31,7 @@ Completed improvements:
 - Added Jenkins CI pipeline with Maven test/package and Docker image build stages
 - Added Actuator health and info endpoints
 - Added Docker healthcheck using `/actuator/health`
+- Added Flyway baseline migration for repeatable production schema creation
 - Added service, controller, and security access tests
 - Replaced console output with structured SLF4J logging
 - Encoded passwords consistently across user mutation flows
@@ -46,6 +47,7 @@ Completed improvements:
 - JWT authentication
 - springdoc OpenAPI
 - Spring Boot Actuator
+- Flyway
 - Docker and Docker Compose
 - Jenkins
 - JUnit 5, Mockito, MockMvc, Spring Security Test
@@ -143,8 +145,11 @@ Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins wi
 
 Use `.env.example` as the reference for local development. Do not commit `.env`.
 
+Use `.env.production.example` as the reference for live deployment. Do not commit real production values.
+
 Important variables:
 
+- `SPRING_PROFILES_ACTIVE`
 - `DB_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
@@ -171,6 +176,47 @@ Spring Boot Actuator exposes only safe public endpoints by default:
 ```
 
 These endpoints are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations.
+
+## Production Readiness
+
+The backend is ready for the first live portfolio deployment as a Dockerized monolith.
+
+Important deployment behavior:
+
+- Local development uses the `dev` profile by default
+- Live deployment should use `SPRING_PROFILES_ACTIVE=prod`
+- Flyway creates the baseline database schema in a repeatable way
+- The production profile uses `spring.jpa.hibernate.ddl-auto=validate`
+- Secrets and environment-specific values are passed through environment variables
+- CORS must be restricted to the deployed frontend URL
+- Actuator exposes only `/actuator/health` and `/actuator/info`
+
+For a frontend deployed at `https://your-domain.com`, use:
+
+```text
+CORS_ALLOWED_ORIGINS=https://your-domain.com
+```
+
+## Dependency And Security Checks
+
+Backend dependency versions are managed through the Spring Boot parent wherever possible. This keeps Spring, Jackson, Tomcat, validation, logging, and test dependencies aligned with the selected Spring Boot release.
+
+Recommended checks before deployment:
+
+```bash
+mvn test
+mvn dependency:tree
+```
+
+Security-related improvements already applied:
+
+- No committed runtime secrets in current configuration
+- BCrypt password encoding
+- JWT secret externalized through `JWT_SECRET`
+- Stateless Spring Security filter chain
+- Public endpoints explicitly whitelisted
+- Production schema managed by Flyway instead of Hibernate auto-create
+- Health endpoint available for Docker, CI/CD, and AWS checks
 
 ## Deployment Roadmap
 

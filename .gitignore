@@ -3,6 +3,7 @@ target/
 .env
 .env.*
 !.env.example
+!.env.production.example
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
