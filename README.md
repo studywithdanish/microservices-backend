@@ -230,6 +230,12 @@ The planned deployment path is incremental and cost-aware:
 6. Add centralized logs and basic metrics.
 7. Add Prometheus and Grafana after the live deployment is stable.
 
+The production Docker Compose and AWS runbook are available in:
+
+```text
+deploy/
+```
+
 ## Microservices Migration Roadmap
 
 The monolith will be split only after the production baseline is stable.
