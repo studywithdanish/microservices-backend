@@ -1,14 +1,14 @@
 # Production Deployment Runbook
 
-This runbook deploys the backend, frontend, MySQL, and Nginx reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the backend, frontend, MySQL, and Caddy reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
 ```text
-http://your-domain.com
+https://your-domain.com
 ```
 
-Nginx routes traffic internally:
+Caddy manages HTTPS certificates automatically and routes traffic internally:
 
 ```text
 /                    -> React frontend
@@ -27,7 +27,7 @@ Before creating the server:
 - Create an AWS budget alert around your monthly target.
 - Use one small Lightsail/EC2 Ubuntu server.
 - Do not create RDS, EKS, NAT Gateway, or Load Balancer for the first portfolio deployment.
-- Open only required firewall ports: `22` and `80` initially, `443` after SSL.
+- Open only required firewall ports: `22`, `80`, and `443`.
 
 Updating the application later on the same server does not add fixed monthly cost. Cost changes only if you add larger infrastructure, storage, snapshots, high traffic, or managed services.
 
@@ -78,16 +78,17 @@ cp .env.production.example .env
 nano .env
 ```
 
-For first smoke test with a server IP:
+For first smoke test with a server IP before HTTPS is enabled:
 
 ```text
 PUBLIC_FRONTEND_ORIGIN=http://SERVER_PUBLIC_IP
 PUBLIC_API_BASE_URL=http://SERVER_PUBLIC_IP
 ```
 
-After DNS and SSL:
+After DNS is pointed to the server:
 
 ```text
+PUBLIC_DOMAIN=your-domain.com
 PUBLIC_FRONTEND_ORIGIN=https://your-domain.com
 PUBLIC_API_BASE_URL=https://your-domain.com
 ```
@@ -133,9 +134,9 @@ docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
 Use these URLs:
 
 ```text
-http://SERVER_PUBLIC_IP/
-http://SERVER_PUBLIC_IP/actuator/health
-http://SERVER_PUBLIC_IP/swagger-ui/index.html
+https://your-domain.com/
+https://your-domain.com/actuator/health
+https://your-domain.com/swagger-ui/index.html
 ```
 
 Then test from the React frontend:
@@ -180,15 +181,25 @@ After recovery, return to `main` when ready:
 git checkout main
 ```
 
-## 9. Interview Explanation
+## 9. DNS And HTTPS
 
-I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Nginx is the public entry point and routes frontend and backend traffic internally. The backend runs with the production profile, uses Flyway for database schema versioning, and stores secrets in environment variables. MySQL data and uploaded images use persistent Docker volumes. I avoided EKS, RDS, and load balancers for the first portfolio deployment to control cost, while keeping the architecture ready for Jenkins CD, Terraform, monitoring, and later Kubernetes migration.
-
-## 10. HTTPS Follow-Up
-
-First verify the application over HTTP using the server IP or domain. After DNS is stable, add HTTPS and update:
+Point these DNS records to the server static IP:
 
 ```text
+A  @    SERVER_STATIC_IP
+A  www  SERVER_STATIC_IP
+```
+
+Keep the DNS records in DNS-only mode while Caddy issues certificates directly from Let's Encrypt. Open `80` and `443` in the Lightsail firewall.
+
+## 10. Interview Explanation
+
+I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Caddy is the public entry point, manages HTTPS automatically, and routes frontend and backend traffic internally. The backend runs with the production profile, uses Flyway for database schema versioning, and stores secrets in environment variables. MySQL data, uploaded images, and TLS certificate data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost, while keeping the architecture ready for Jenkins CD, Terraform, monitoring, and later Kubernetes migration.
+
+## 11. Switching From IP Smoke Test To Domain
+
+```text
+PUBLIC_DOMAIN=your-domain.com
 PUBLIC_FRONTEND_ORIGIN=https://your-domain.com
 PUBLIC_API_BASE_URL=https://your-domain.com
 ```
@@ -198,5 +209,3 @@ Then rebuild the frontend and reverse proxy:
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build frontend reverse-proxy
 ```
-
-HTTPS can be added with a certificate-managed reverse proxy step after the first HTTP deployment is healthy.

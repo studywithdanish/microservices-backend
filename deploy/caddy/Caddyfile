@@ -1,0 +1,41 @@
+{$PUBLIC_DOMAIN} {
+    encode gzip zstd
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    request_body {
+        max_size 10MB
+    }
+
+    handle /api/* {
+        reverse_proxy backend:9090
+    }
+
+    handle /actuator/* {
+        reverse_proxy backend:9090
+    }
+
+    handle /v3/api-docs* {
+        reverse_proxy backend:9090
+    }
+
+    handle /swagger-ui/* {
+        reverse_proxy backend:9090
+    }
+
+    handle /swagger-ui.html {
+        reverse_proxy backend:9090
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+
+www.{$PUBLIC_DOMAIN} {
+    redir https://{$PUBLIC_DOMAIN}{uri} permanent
+}
