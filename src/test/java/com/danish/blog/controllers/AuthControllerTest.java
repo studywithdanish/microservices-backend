@@ -27,6 +27,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -119,6 +120,18 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.name").value("Username must be at least 4 characters"))
                 .andExpect(jsonPath("$.email").value("Email address is not valid"))
                 .andExpect(jsonPath("$.about").exists());
+    }
+
+    @Test
+    void currentUserShouldReturnAuthenticatedUserProfile() throws Exception {
+        UserDto response = userDto(1, "Danish", "danish@example.com", "encoded", "Platform learner");
+        when(userService.getUserByEmail("danish@example.com")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .principal(() -> "danish@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.email").value("danish@example.com"));
     }
 
     private UserDto userDto(int id, String name, String email, String password, String about) {

@@ -15,12 +15,14 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import java.security.Principal;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -71,5 +73,15 @@ public class AuthController {
     public ResponseEntity<UserDto> registerUser(@Valid @RequestBody UserDto userDto){
         UserDto registeredUser = userService.registerUser(userDto);
         return new ResponseEntity<UserDto>(registeredUser, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> getCurrentUser(Principal principal) {
+        if (principal == null) {
+            throw new ApiException("Authenticated principal is required");
+        }
+
+        UserDto currentUser = userService.getUserByEmail(principal.getName());
+        return ResponseEntity.ok(currentUser);
     }
 }

@@ -2,6 +2,7 @@ package com.danish.blog.services.impl;
 
 import com.danish.blog.entities.Role;
 import com.danish.blog.entities.User;
+import com.danish.blog.exceptions.ApiException;
 import com.danish.blog.exceptions.ResourceNotFoundException;
 import com.danish.blog.payloads.AppConstants;
 import com.danish.blog.payloads.UserDto;
@@ -74,6 +75,15 @@ public class UserServiceImpl implements UserService {
 
         User user = this.userRepo.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", "ID", userId));
         logger.debug("Fetched user by id: {}", userId);
+        return this.userToDto(user);
+    }
+
+    @Override
+    public UserDto getUserByEmail(String email) {
+
+        User user = this.userRepo.findByEmail(email)
+                .orElseThrow(() -> new ApiException("Authenticated user profile was not found"));
+        logger.debug("Fetched authenticated user profile for email: {}", email);
         return this.userToDto(user);
     }
 

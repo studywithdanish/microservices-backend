@@ -66,6 +66,12 @@ class SecurityAccessTest {
     }
 
     @Test
+    void currentUserEndpointShouldRejectAnonymousRequests() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void protectedUserEndpointShouldRejectAnonymousRequests() throws Exception {
         mockMvc.perform(get("/api/users/"))
                 .andExpect(status().isUnauthorized());
