@@ -2,122 +2,167 @@ package com.danish.blog.services.impl;
 
 import com.danish.blog.entities.Category;
 import com.danish.blog.entities.Post;
-import com.danish.blog.entities.User;
+import com.danish.blog.exceptions.ApiException;
 import com.danish.blog.exceptions.ResourceNotFoundException;
+import com.danish.blog.payloads.CategoryDto;
+import com.danish.blog.payloads.PostCreateRequest;
 import com.danish.blog.payloads.PostDto;
 import com.danish.blog.payloads.PostResponse;
-import com.danish.blog.payloads.UserDto;
+import com.danish.blog.payloads.PostUpdateRequest;
 import com.danish.blog.repositories.CategoryRepo;
 import com.danish.blog.repositories.PostRepo;
-import com.danish.blog.repositories.UserRepo;
+import com.danish.blog.security.AuthenticatedUser;
 import com.danish.blog.services.PostService;
-import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class PostServiceImpl implements PostService {
 
     private final PostRepo postRepo;
-    private final ModelMapper modelMapper;
-    private final UserRepo userRepo;
     private final CategoryRepo categoryRepo;
 
-    public PostServiceImpl(PostRepo postRepo, ModelMapper modelMapper, UserRepo userRepo, CategoryRepo categoryRepo) {
+    public PostServiceImpl(PostRepo postRepo, CategoryRepo categoryRepo) {
         this.postRepo = postRepo;
-        this.modelMapper = modelMapper;
-        this.userRepo = userRepo;
         this.categoryRepo = categoryRepo;
     }
 
     @Override
-    public PostDto createPost(PostDto postDto, Integer userId, Integer categoryId) {
-        User user = userRepo.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", "User Id", userId));
-        Category category = categoryRepo.findById(categoryId).orElseThrow(() -> new ResourceNotFoundException("Category", "Category Id", categoryId));
-        Post post = modelMapper.map(postDto, Post.class);
-        post.setUser(user);
+    public PostDto createPost(PostCreateRequest request, Integer authorId) {
+        if (request.getCategoryId() == null) {
+            throw new ApiException("Category id is required");
+        }
+
+        Category category = categoryRepo.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "Category Id", request.getCategoryId()));
+        Post post = new Post();
+        post.setTitle(request.getTitle().trim());
+        post.setContent(request.getContent().trim());
+        post.setAuthorId(authorId);
         post.setCategory(category);
         post.setImageName("default.png");
         post.setAddedDate(new Date());
-        Post savedPost = postRepo.save(post);
-        return modelMapper.map(savedPost, PostDto.class);
+        return toDto(postRepo.save(post));
     }
 
     @Override
-    public PostDto updatePost(PostDto postDto, Integer postId) {
-        Post post = postRepo.findById(postId).orElseThrow(() -> new ResourceNotFoundException("Post", "PostId", postId));
-        post.setTitle(postDto.getTitle());
-        post.setContent(postDto.getContent());
-        post.setImageName(postDto.getImageName());
-        Post updatedPost = postRepo.save(post);
-        return modelMapper.map(updatedPost, PostDto.class);
+    public PostDto updatePost(PostUpdateRequest request, Integer postId, AuthenticatedUser actor) {
+        Post post = findPost(postId);
+        requireCanModify(post, actor);
+        post.setTitle(request.getTitle().trim());
+        post.setContent(request.getContent().trim());
+        return toDto(postRepo.save(post));
     }
 
     @Override
-    public void deletePost(Integer postId) {
-        Post post = postRepo.findById(postId).orElseThrow(() -> new ResourceNotFoundException("Post", "PostId", postId));
+    public PostDto updatePostImage(Integer postId, String imageName, AuthenticatedUser actor) {
+        Post post = findPost(postId);
+        requireCanModify(post, actor);
+        post.setImageName(imageName);
+        return toDto(postRepo.save(post));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void verifyCanModify(Integer postId, AuthenticatedUser actor) {
+        requireCanModify(findPost(postId), actor);
+    }
+
+    @Override
+    public void deletePost(Integer postId, AuthenticatedUser actor) {
+        Post post = findPost(postId);
+        requireCanModify(post, actor);
         postRepo.delete(post);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PostResponse getAllPosts(Integer pageNumber, Integer pageSize, String sortBy, String sortDir) {
-        Sort sort=(sortDir.equalsIgnoreCase("asc"))?Sort.by(sortBy).ascending(): Sort.by(sortBy).descending();
+        Sort sort = sortDir.equalsIgnoreCase("asc")
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(pageNumber, pageSize, sort);
+        Page<Post> page = postRepo.findAll(pageable);
 
-
-       /* if (sortDir.equalsIgnoreCase("asc")){
-            sort=Sort.by(sortBy).ascending();
-        }else{
-            sort=Sort.by(sortBy).descending();
-        }*/
-        Pageable p = PageRequest.of(pageNumber,pageSize, sort);
-        Page<Post> pagePost = postRepo.findAll(p);
-        List<Post> allPosts = pagePost.getContent();
-        List<PostDto> postDtos = allPosts.stream().map(post -> modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
-
-        PostResponse postResponse = new PostResponse();
-        postResponse.setContent(postDtos);
-        postResponse.setPageNo(pagePost.getNumber());
-        postResponse.setPageSize(pagePost.getSize());
-        postResponse.setTotalElement(pagePost.getTotalElements());
-        postResponse.setTotalPages(pagePost.getTotalPages());
-        postResponse.setLastPage(pagePost.isLast());
-        return postResponse;
+        PostResponse response = new PostResponse();
+        response.setContent(page.getContent().stream().map(this::toDto).toList());
+        response.setPageNo(page.getNumber());
+        response.setPageSize(page.getSize());
+        response.setTotalElement(page.getTotalElements());
+        response.setTotalPages(page.getTotalPages());
+        response.setLastPage(page.isLast());
+        return response;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PostDto getPostById(Integer postId) {
-        Post post = postRepo.findById(postId).orElseThrow(() -> new ResourceNotFoundException("Post", "Post Id", postId));
-        return modelMapper.map(post, PostDto.class);
+        return toDto(findPost(postId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PostDto> getPostByCategory(Integer categoryId) {
-        Category category = categoryRepo.findById(categoryId).orElseThrow(() -> new ResourceNotFoundException("Category", "Category Id", categoryId));
-        List<Post> posts = postRepo.findByCategory(category);
-        List<PostDto> postDtos = posts.stream().map(post -> modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
-        return postDtos;
+        Category category = categoryRepo.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "Category Id", categoryId));
+        return postRepo.findByCategory(category).stream().map(this::toDto).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PostDto> getPostByUser(Integer userId) {
-        User user = userRepo.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User", "User Id", userId));
-        List<Post> posts = postRepo.findByUser(user);
-        List<PostDto> postDtos = posts.stream().map(post -> modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
-        return postDtos;
+        return postRepo.findByAuthorId(userId).stream().map(this::toDto).toList();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PostDto> searchPosts(String keyword) {
-        List<Post> posts = postRepo.SearchByTitle("%"+(keyword)+"%");
-       // List<Post> posts = postRepo.findByTitleContaining(keyword);
-        List<PostDto> postDtos = posts.stream().map(post -> modelMapper.map(post, PostDto.class)).collect(Collectors.toList());
-        return postDtos;
+        return postRepo.SearchByTitle("%" + keyword + "%").stream().map(this::toDto).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsById(Integer postId) {
+        return postRepo.existsById(postId);
+    }
+
+    private Post findPost(Integer postId) {
+        return postRepo.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post", "PostId", postId));
+    }
+
+    private void requireCanModify(Post post, AuthenticatedUser actor) {
+        if (actor == null || !actor.canManage(post.getAuthorId())) {
+            throw new AccessDeniedException("You cannot modify another user's post");
+        }
+    }
+
+    private PostDto toDto(Post post) {
+        PostDto dto = new PostDto();
+        dto.setPostId(post.getPostId());
+        dto.setTitle(post.getTitle());
+        dto.setContent(post.getContent());
+        dto.setImageName(post.getImageName());
+        dto.setAddedDate(post.getAddedDate());
+        dto.setAuthorId(post.getAuthorId());
+        dto.setCategory(toCategoryDto(post.getCategory()));
+        return dto;
+    }
+
+    private CategoryDto toCategoryDto(Category category) {
+        CategoryDto dto = new CategoryDto();
+        dto.setCategoryId(category.getCategoryId());
+        dto.setCategoryTitle(category.getCategoryTitle());
+        dto.setCategoryDescription(category.getCategoryDescription());
+        return dto;
     }
 }

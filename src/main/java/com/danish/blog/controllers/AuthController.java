@@ -3,7 +3,8 @@ package com.danish.blog.controllers;
 import com.danish.blog.exceptions.ApiException;
 import com.danish.blog.payloads.JwtAuthRequest;
 import com.danish.blog.payloads.JwtAuthResponse;
-import com.danish.blog.payloads.UserDto;
+import com.danish.blog.payloads.UserRegistrationRequest;
+import com.danish.blog.payloads.UserResponse;
 import com.danish.blog.security.JwtTokenHelper;
 import com.danish.blog.services.UserService;
 import org.slf4j.Logger;
@@ -49,7 +50,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<JwtAuthResponse> createToken(
-            @RequestBody JwtAuthRequest request
+            @Valid @RequestBody JwtAuthRequest request
             ) throws Exception {
         authenticate(request.getUsername(), request.getPassword());
         UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
@@ -65,23 +66,23 @@ public class AuthController {
             authenticationManager.authenticate(usernamePasswordAuthenticationToken);
         } catch (BadCredentialsException e) {
             logger.warn("Failed login attempt for username: {}", username);
-            throw new ApiException("Invalide Username or password !!");
+            throw new ApiException("Invalid username or password");
         }
     }
 
     @PostMapping("/register")
-    public ResponseEntity<UserDto> registerUser(@Valid @RequestBody UserDto userDto){
-        UserDto registeredUser = userService.registerUser(userDto);
-        return new ResponseEntity<UserDto>(registeredUser, HttpStatus.CREATED);
+    public ResponseEntity<UserResponse> registerUser(@Valid @RequestBody UserRegistrationRequest request){
+        UserResponse registeredUser = userService.registerUser(request);
+        return new ResponseEntity<>(registeredUser, HttpStatus.CREATED);
     }
 
     @GetMapping("/me")
-    public ResponseEntity<UserDto> getCurrentUser(Principal principal) {
+    public ResponseEntity<UserResponse> getCurrentUser(Principal principal) {
         if (principal == null) {
             throw new ApiException("Authenticated principal is required");
         }
 
-        UserDto currentUser = userService.getUserByEmail(principal.getName());
+        UserResponse currentUser = userService.getUserByEmail(principal.getName());
         return ResponseEntity.ok(currentUser);
     }
 }

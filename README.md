@@ -36,6 +36,31 @@ Completed improvements:
 - Replaced console output with structured SLF4J logging
 - Encoded passwords consistently across user mutation flows
 - Refactored services and controllers to constructor injection
+- Completed Phase 1 microservice-readiness boundaries and ownership controls
+
+## Phase 1: Microservice-Ready Modular Monolith
+
+Phase 1 keeps one deployable Spring Boot application while reducing the coupling that would make later service extraction risky.
+
+Implemented boundaries and safeguards:
+
+- Replaced the shared user DTO with separate registration, update, and response contracts so passwords are never returned by user APIs
+- Replaced cross-domain JPA object graphs with scalar ownership identifiers (`authorId` and `postId`) across user, post, and comment boundaries
+- Derived the acting user from the authenticated JWT identity instead of trusting client-supplied user IDs
+- Enforced owner-or-admin authorization for user, post, comment, and post-image mutations
+- Restricted category mutations and user administration APIs to administrators
+- Added validated post and comment request contracts and strengthened login/registration validation
+- Added safe image type checks and normalized storage paths to prevent unsupported uploads and path traversal
+- Added Flyway migration `V2__prepare_service_ownership_boundaries.sql` for ownership indexes, removal of the cross-boundary post/user foreign key, and comment lifecycle handling
+- Added unit and security tests for the new ownership and authorization rules
+
+The preferred authenticated post creation endpoint is:
+
+```text
+POST /api/posts
+```
+
+For a gradual frontend migration, the existing post-creation route remains available but validates its `userId` against the authenticated user. Registration passwords must be 8-72 characters.
 
 ## Tech Stack
 

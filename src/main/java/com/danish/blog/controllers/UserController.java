@@ -1,11 +1,16 @@
 package com.danish.blog.controllers;
 
 import com.danish.blog.payloads.ApiResponse;
-import com.danish.blog.payloads.UserDto;
+import com.danish.blog.payloads.UserRegistrationRequest;
+import com.danish.blog.payloads.UserResponse;
+import com.danish.blog.payloads.UserUpdateRequest;
+import com.danish.blog.security.AuthenticatedUser;
+import com.danish.blog.security.AuthenticatedUserProvider;
 import com.danish.blog.services.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -16,21 +21,27 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final AuthenticatedUserProvider authenticatedUserProvider;
 
-    public UserController(UserService userService) {
+    public UserController(UserService userService, AuthenticatedUserProvider authenticatedUserProvider) {
         this.userService = userService;
+        this.authenticatedUserProvider = authenticatedUserProvider;
     }
 
     @PostMapping("/")
-    public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserDto userDto){
-        UserDto createdUserDto = userService.createUser(userDto);
-        return new ResponseEntity<>(createdUserDto, HttpStatus.CREATED);
+    public ResponseEntity<UserResponse> createUser(@Valid @RequestBody UserRegistrationRequest request){
+        UserResponse createdUser = userService.createUser(request);
+        return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
 
     @PutMapping("/{userId}")
-    public ResponseEntity<UserDto> updateUser(@Valid @RequestBody UserDto userDto, @PathVariable("userId") Integer uid){
-        UserDto updatedUserDto = this.userService.updateUser(userDto, uid);
-        return ResponseEntity.ok(updatedUserDto);
+    public ResponseEntity<UserResponse> updateUser(
+            @Valid @RequestBody UserUpdateRequest request,
+            @PathVariable("userId") Integer userId,
+            Authentication authentication
+    ) {
+        AuthenticatedUser actor = authenticatedUserProvider.getCurrentUser(authentication);
+        return ResponseEntity.ok(userService.updateUser(request, userId, actor));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -41,14 +52,14 @@ public class UserController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<UserDto> getUserById(@PathVariable Integer userId){
-        UserDto userById = userService.getUserById(userId);
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Integer userId){
+        UserResponse userById = userService.getUserById(userId);
         return ResponseEntity.ok(userById);
     }
 
     @GetMapping("/")
-    public ResponseEntity<List<UserDto>> getAllUsers(){
-        List<UserDto> allUsers = userService.getAllUsers();
+    public ResponseEntity<List<UserResponse>> getAllUsers(){
+        List<UserResponse> allUsers = userService.getAllUsers();
         return ResponseEntity.ok(allUsers);
     }
 }
