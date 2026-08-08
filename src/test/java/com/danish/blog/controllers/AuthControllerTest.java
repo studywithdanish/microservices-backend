@@ -2,7 +2,8 @@ package com.danish.blog.controllers;
 
 import com.danish.blog.exceptions.GlobalExceptionHandler;
 import com.danish.blog.payloads.JwtAuthRequest;
-import com.danish.blog.payloads.UserDto;
+import com.danish.blog.payloads.UserRegistrationRequest;
+import com.danish.blog.payloads.UserResponse;
 import com.danish.blog.repositories.RoleRepo;
 import com.danish.blog.security.JwtTokenHelper;
 import com.danish.blog.services.UserService;
@@ -92,55 +93,71 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Invalide Username or password !!"));
+                .andExpect(jsonPath("$.message").value("Invalid username or password"));
     }
 
     @Test
     void registerShouldReturnCreatedUser() throws Exception {
-        UserDto request = userDto(0, "Danish", "danish@example.com", "pass123", "Platform learner");
-        UserDto response = userDto(1, "Danish", "danish@example.com", "encoded", "Platform learner");
-        when(userService.registerUser(any(UserDto.class))).thenReturn(response);
+        UserRegistrationRequest request = registrationRequest(
+                "Danish", "danish@example.com", "password123", "Platform learner");
+        UserResponse response = userResponse(1, "Danish", "danish@example.com", "Platform learner");
+        when(userService.registerUser(any(UserRegistrationRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.email").value("danish@example.com"));
+                .andExpect(jsonPath("$.email").value("danish@example.com"))
+                .andExpect(jsonPath("$.password").doesNotExist());
     }
 
     @Test
     void registerShouldReturnBadRequestForInvalidPayload() throws Exception {
-        UserDto request = userDto(0, "Dan", "invalid-email", "pw", "");
+        UserRegistrationRequest request = registrationRequest("Dan", "invalid-email", "pw", "");
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.name").value("Username must be at least 4 characters"))
+                .andExpect(jsonPath("$.name").value("Username must be between 4 and 100 characters"))
                 .andExpect(jsonPath("$.email").value("Email address is not valid"))
                 .andExpect(jsonPath("$.about").exists());
     }
 
     @Test
     void currentUserShouldReturnAuthenticatedUserProfile() throws Exception {
-        UserDto response = userDto(1, "Danish", "danish@example.com", "encoded", "Platform learner");
+        UserResponse response = userResponse(1, "Danish", "danish@example.com", "Platform learner");
         when(userService.getUserByEmail("danish@example.com")).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .principal(() -> "danish@example.com"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.email").value("danish@example.com"));
+                .andExpect(jsonPath("$.email").value("danish@example.com"))
+                .andExpect(jsonPath("$.password").doesNotExist());
     }
 
-    private UserDto userDto(int id, String name, String email, String password, String about) {
-        UserDto userDto = new UserDto();
-        userDto.setId(id);
-        userDto.setName(name);
-        userDto.setEmail(email);
-        userDto.setPassword(password);
-        userDto.setAbout(about);
-        return userDto;
+    private UserRegistrationRequest registrationRequest(
+            String name,
+            String email,
+            String password,
+            String about
+    ) {
+        UserRegistrationRequest request = new UserRegistrationRequest();
+        request.setName(name);
+        request.setEmail(email);
+        request.setPassword(password);
+        request.setAbout(about);
+        return request;
+    }
+
+    private UserResponse userResponse(int id, String name, String email, String about) {
+        UserResponse response = new UserResponse();
+        response.setId(id);
+        response.setName(name);
+        response.setEmail(email);
+        response.setAbout(about);
+        return response;
     }
 }

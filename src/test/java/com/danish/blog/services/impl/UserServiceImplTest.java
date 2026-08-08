@@ -4,17 +4,19 @@ import com.danish.blog.entities.Role;
 import com.danish.blog.entities.User;
 import com.danish.blog.exceptions.ResourceNotFoundException;
 import com.danish.blog.payloads.AppConstants;
-import com.danish.blog.payloads.UserDto;
+import com.danish.blog.payloads.UserRegistrationRequest;
+import com.danish.blog.payloads.UserResponse;
+import com.danish.blog.payloads.UserUpdateRequest;
 import com.danish.blog.repositories.RoleRepo;
 import com.danish.blog.repositories.UserRepo;
+import com.danish.blog.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.modelmapper.ModelMapper;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -33,105 +36,110 @@ class UserServiceImplTest {
     private UserRepo userRepo;
 
     @Mock
-    private ModelMapper modelMapper;
-
-    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
     private RoleRepo roleRepo;
 
-    @InjectMocks
     private UserServiceImpl userService;
-
     private User user;
-    private UserDto userDto;
 
     @BeforeEach
     void setUp() {
+        userService = new UserServiceImpl(userRepo, passwordEncoder, roleRepo);
         user = new User();
         user.setId(1);
         user.setName("Danish");
         user.setEmail("danish@example.com");
-        user.setPassword("plain123");
+        user.setPassword("encoded-password");
         user.setAbout("Platform engineering learner");
-
-        userDto = new UserDto();
-        userDto.setId(1);
-        userDto.setName("Danish");
-        userDto.setEmail("danish@example.com");
-        userDto.setPassword("plain123");
-        userDto.setAbout("Platform engineering learner");
     }
 
     @Test
-    void registerUserShouldEncodePasswordAndAssignNormalRole() {
-        Role normalRole = new Role();
-        normalRole.setId(AppConstants.NORMAL_USER);
-        normalRole.setName("ROLE_NORMAL");
-
-        when(modelMapper.map(userDto, User.class)).thenReturn(user);
+    void registerUserShouldEncodePasswordAssignRoleAndReturnSafeResponse() {
+        Role normalRole = normalRole();
+        UserRegistrationRequest request = registrationRequest();
         when(passwordEncoder.encode("plain123")).thenReturn("encoded-password");
         when(roleRepo.findById(AppConstants.NORMAL_USER)).thenReturn(Optional.of(normalRole));
-        when(userRepo.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(modelMapper.map(any(User.class), any())).thenReturn(userDto);
+        when(userRepo.save(any(User.class))).thenAnswer(invocation -> {
+            User saved = invocation.getArgument(0);
+            saved.setId(1);
+            return saved;
+        });
 
-        userService.registerUser(userDto);
+        UserResponse response = userService.registerUser(request);
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepo).save(userCaptor.capture());
-        User savedUser = userCaptor.getValue();
-
-        assertThat(savedUser.getPassword()).isEqualTo("encoded-password");
-        assertThat(savedUser.getRoles()).containsExactly(normalRole);
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepo).save(captor.capture());
+        assertThat(captor.getValue().getPassword()).isEqualTo("encoded-password");
+        assertThat(captor.getValue().getRoles()).containsExactly(normalRole);
+        assertThat(response.getId()).isEqualTo(1);
+        assertThat(response.getEmail()).isEqualTo("danish@example.com");
+        assertThat(UserResponse.class.getDeclaredFields())
+                .extracting(java.lang.reflect.Field::getName)
+                .doesNotContain("password");
     }
 
     @Test
-    void createUserShouldEncodePasswordBeforeSaving() {
-        when(modelMapper.map(userDto, User.class)).thenReturn(user);
+    void createUserShouldCreateUsableNormalAccount() {
         when(passwordEncoder.encode("plain123")).thenReturn("encoded-password");
+        when(roleRepo.findById(AppConstants.NORMAL_USER)).thenReturn(Optional.of(normalRole()));
         when(userRepo.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(modelMapper.map(any(User.class), any())).thenReturn(userDto);
 
-        userService.createUser(userDto);
+        userService.createUser(registrationRequest());
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepo).save(userCaptor.capture());
-
-        assertThat(userCaptor.getValue().getPassword()).isEqualTo("encoded-password");
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepo).save(captor.capture());
+        assertThat(captor.getValue().getRoles())
+                .extracting(Role::getName)
+                .containsExactly("ROLE_NORMAL");
     }
 
     @Test
-    void updateUserShouldEncodeUpdatedPasswordBeforeSaving() {
-        UserDto updateRequest = new UserDto();
-        updateRequest.setName("Danish Khan");
-        updateRequest.setEmail("danish.khan@example.com");
-        updateRequest.setPassword("newpass");
-        updateRequest.setAbout("Updated profile");
-
+    void updateUserShouldAllowOwnerAndEncodeProvidedPassword() {
+        UserUpdateRequest request = updateRequest("newpass123");
         when(userRepo.findById(1)).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode("newpass")).thenReturn("encoded-new-password");
-        when(userRepo.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(modelMapper.map(any(User.class), any())).thenReturn(updateRequest);
+        when(passwordEncoder.encode("newpass123")).thenReturn("encoded-new-password");
+        when(userRepo.save(user)).thenReturn(user);
 
-        userService.updateUser(updateRequest, 1);
+        UserResponse response = userService.updateUser(
+                request,
+                1,
+                new AuthenticatedUser(1, "danish@example.com", false)
+        );
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(userRepo).save(userCaptor.capture());
-        User savedUser = userCaptor.getValue();
+        assertThat(user.getPassword()).isEqualTo("encoded-new-password");
+        assertThat(response.getName()).isEqualTo("Danish Khan");
+    }
 
-        assertThat(savedUser.getName()).isEqualTo("Danish Khan");
-        assertThat(savedUser.getEmail()).isEqualTo("danish.khan@example.com");
-        assertThat(savedUser.getPassword()).isEqualTo("encoded-new-password");
-        assertThat(savedUser.getAbout()).isEqualTo("Updated profile");
+    @Test
+    void updateUserShouldPreservePasswordWhenItIsNotProvided() {
+        UserUpdateRequest request = updateRequest(null);
+        when(userRepo.findById(1)).thenReturn(Optional.of(user));
+        when(userRepo.save(user)).thenReturn(user);
+
+        userService.updateUser(request, 1, new AuthenticatedUser(1, "danish@example.com", false));
+
+        assertThat(user.getPassword()).isEqualTo("encoded-password");
+        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    void updateUserShouldRejectDifferentNonAdminUser() {
+        assertThatThrownBy(() -> userService.updateUser(
+                updateRequest(null),
+                1,
+                new AuthenticatedUser(2, "other@example.com", false)
+        )).isInstanceOf(AccessDeniedException.class);
+
+        verify(userRepo, never()).findById(any());
     }
 
     @Test
     void getUserByIdShouldReturnMappedUser() {
         when(userRepo.findById(1)).thenReturn(Optional.of(user));
-        when(modelMapper.map(user, UserDto.class)).thenReturn(userDto);
 
-        UserDto result = userService.getUserById(1);
+        UserResponse result = userService.getUserById(1);
 
         assertThat(result.getEmail()).isEqualTo("danish@example.com");
         assertThat(result.getName()).isEqualTo("Danish");
@@ -147,11 +155,10 @@ class UserServiceImplTest {
     }
 
     @Test
-    void getAllUsersShouldReturnMappedUsers() {
+    void getAllUsersShouldReturnSafeResponses() {
         when(userRepo.findAll()).thenReturn(List.of(user));
-        when(modelMapper.map(any(User.class), any())).thenReturn(userDto);
 
-        List<UserDto> result = userService.getAllUsers();
+        List<UserResponse> result = userService.getAllUsers();
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getEmail()).isEqualTo("danish@example.com");
@@ -164,5 +171,30 @@ class UserServiceImplTest {
         userService.deleteUser(1);
 
         verify(userRepo).delete(user);
+    }
+
+    private UserRegistrationRequest registrationRequest() {
+        UserRegistrationRequest request = new UserRegistrationRequest();
+        request.setName("Danish");
+        request.setEmail("DANISH@example.com");
+        request.setPassword("plain123");
+        request.setAbout("Platform engineering learner");
+        return request;
+    }
+
+    private UserUpdateRequest updateRequest(String password) {
+        UserUpdateRequest request = new UserUpdateRequest();
+        request.setName("Danish Khan");
+        request.setEmail("danish.khan@example.com");
+        request.setPassword(password);
+        request.setAbout("Updated profile");
+        return request;
+    }
+
+    private Role normalRole() {
+        Role role = new Role();
+        role.setId(AppConstants.NORMAL_USER);
+        role.setName("ROLE_NORMAL");
+        return role;
     }
 }

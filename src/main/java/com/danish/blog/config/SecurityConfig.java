@@ -50,6 +50,7 @@ public class SecurityConfig {
 
     public static final String[] PUBLIC_GET_URLS = {
             "/api/posts",
+            "/api/posts/**",
             "/api/post/**",
             "/api/posts/search/**",
             "/api/category/**",
@@ -78,6 +79,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_URLS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_URLS).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/users", "/api/users/").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

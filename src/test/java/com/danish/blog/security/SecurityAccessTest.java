@@ -1,7 +1,7 @@
 package com.danish.blog.security;
 
 import com.danish.blog.payloads.CategoryDto;
-import com.danish.blog.payloads.UserDto;
+import com.danish.blog.payloads.UserRegistrationRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +52,7 @@ class SecurityAccessTest {
 
     @Test
     void authRegisterEndpointShouldBePublic() throws Exception {
-        UserDto request = new UserDto();
+        UserRegistrationRequest request = new UserRegistrationRequest();
         request.setName("Dan");
         request.setEmail("invalid-email");
         request.setPassword("pw");
@@ -79,7 +79,14 @@ class SecurityAccessTest {
 
     @Test
     @WithMockUser(roles = "NORMAL")
-    void protectedUserEndpointShouldAllowAuthenticatedRequests() throws Exception {
+    void userListShouldRejectNonAdminUsers() throws Exception {
+        mockMvc.perform(get("/api/users/"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void userListShouldAllowAdminUsers() throws Exception {
         mockMvc.perform(get("/api/users/"))
                 .andExpect(status().isOk());
     }
@@ -101,5 +108,18 @@ class SecurityAccessTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "NORMAL")
+    void categoryCreateShouldRejectNonAdminUsers() throws Exception {
+        CategoryDto request = new CategoryDto();
+        request.setCategoryTitle("Cloud");
+        request.setCategoryDescription("Cloud platform articles");
+
+        mockMvc.perform(post("/api/categories/")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
     }
 }
