@@ -14,7 +14,8 @@ pipeline {
 
     environment {
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
-        DOCKER_IMAGE_NAME = 'blog-app-apis'
+        BACKEND_IMAGE_NAME = 'blog-app-apis'
+        GATEWAY_IMAGE_NAME = 'blog-api-gateway'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -34,7 +35,7 @@ pipeline {
             }
         }
 
-        stage('Test') {
+        stage('Test Backend') {
             steps {
                 script {
                     runCommand('mvn clean test')
@@ -47,19 +48,34 @@ pipeline {
             }
         }
 
-        stage('Package') {
+        stage('Test Gateway') {
             steps {
                 script {
-                    runCommand('mvn package -DskipTests')
+                    runCommand('mvn -f gateway-service/pom.xml clean test')
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'gateway-service/target/surefire-reports/*.xml'
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Package Applications') {
+            steps {
+                script {
+                    runCommand('mvn package -DskipTests')
+                    runCommand('mvn -f gateway-service/pom.xml package -DskipTests')
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
             steps {
                 script {
                     runCommand('docker --version')
-                    runCommand("docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${DOCKER_IMAGE_NAME}:latest .")
+                    runCommand("docker build -t ${BACKEND_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${BACKEND_IMAGE_NAME}:latest .")
+                    runCommand("docker build -t ${GATEWAY_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${GATEWAY_IMAGE_NAME}:latest gateway-service")
                 }
             }
         }
@@ -67,7 +83,7 @@ pipeline {
 
     post {
         success {
-            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+            archiveArtifacts artifacts: 'target/*.jar,gateway-service/target/*.jar', fingerprint: true
         }
         cleanup {
             cleanWs(deleteDirs: true, disableDeferredWipeout: true)

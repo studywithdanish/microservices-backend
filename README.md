@@ -4,18 +4,20 @@ Spring Boot backend APIs for a blogging platform. The project is being modernize
 
 ## Current Architecture
 
-The current backend is a modular Spring Boot monolith. It exposes blog, category, comment, user, authentication, Swagger/OpenAPI, and operational health endpoints from one deployable application.
+The current backend is in the transitional gateway phase of an incremental microservices migration. Spring Cloud Gateway is the public API entry point, while the Phase 1 modular monolith remains the private downstream application for blog, category, comment, user, and authentication APIs.
 
-This is intentional for the first production baseline: the application is being stabilized with modern Spring Boot, security, tests, Docker, Jenkins, and health checks before extracting services.
+This is intentional: routing is separated before business capabilities are extracted, so the frontend can keep one stable base URL while individual API groups move to new services later.
 
 High-level structure:
 
-- Controllers expose REST APIs
+- Spring Cloud Gateway owns the public API boundary on port `9090`
+- The backend is private inside Docker and continues to enforce JWT authorization
+- Controllers expose REST APIs from the current backend
 - Services contain business logic
 - Repositories handle persistence through Spring Data JPA
 - Spring Security protects write/admin operations with JWT-based authentication
 - MySQL is used for local/prod-style runtime, while tests use an isolated H2 profile
-- Docker Compose runs the backend with MySQL for local platform testing
+- Docker Compose runs the gateway, private backend, and MySQL for local platform testing
 
 ## Engineering Improvements
 
@@ -37,6 +39,7 @@ Completed improvements:
 - Encoded passwords consistently across user mutation flows
 - Refactored services and controllers to constructor injection
 - Completed Phase 1 microservice-readiness boundaries and ownership controls
+- Completed Phase 2 API Gateway routing, correlation IDs, failure handling, Docker integration, and CI coverage
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -62,11 +65,36 @@ POST /api/posts
 
 For a gradual frontend migration, the existing post-creation route remains available but validates its `userId` against the authenticated user. Registration passwords must be 8-72 characters.
 
+## Phase 2: API Gateway Migration Seam
+
+Phase 2 introduces a separately built and deployed Spring Cloud Gateway without prematurely splitting business data.
+
+```text
+Frontend -> API Gateway :9090 -> Modular backend :9090 (private Docker network) -> MySQL
+```
+
+Implemented gateway capabilities:
+
+- Stable public routing for `/api/**`, Swagger UI, and OpenAPI endpoints
+- Transparent forwarding of JWT bearer tokens to the backend
+- Validated or generated `X-Correlation-Id` request and response headers
+- Central browser CORS policy with duplicate downstream headers removed
+- Explicit connection and response timeouts
+- Consistent `503` and `504` JSON responses for unavailable or slow downstream services
+- Gateway-owned health and info endpoints
+- Backend isolation from the host network in Docker Compose
+- Independent gateway tests, Maven build, Docker image, and Jenkins stages
+- Production Caddy routing through the gateway instead of directly to the backend
+
+Authentication and resource authorization intentionally remain in the backend during this phase. The next extraction can route only Auth/User endpoints to an Identity Service while every other route continues to use the current backend.
+
 ## Tech Stack
 
 - Java 17
 - Spring Boot 3.5
 - Spring Security 6
+- Spring Cloud Gateway 4.3
+- Project Reactor and WebFlux
 - Spring Data JPA
 - MySQL
 - JWT authentication
@@ -85,13 +113,13 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start MySQL and the backend:
+Start MySQL, the backend, and the gateway:
 
 ```bash
 docker compose up --build
 ```
 
-The backend runs at:
+The gateway runs at:
 
 ```text
 http://localhost:9090
@@ -136,6 +164,12 @@ mvn test
 
 Tests use an isolated H2 database profile and do not require local MySQL.
 
+Run the gateway tests independently:
+
+```bash
+mvn -f gateway-service/pom.xml test
+```
+
 ## Jenkins Pipeline
 
 This repository includes a `Jenkinsfile` for a basic CI pipeline.
@@ -144,11 +178,11 @@ Pipeline stages:
 
 - Checkout source code
 - Verify Java and Maven versions
-- Run Maven tests
+- Run backend and gateway Maven tests
 - Publish JUnit test reports
-- Package the Spring Boot application
-- Build the Docker image
-- Archive the generated JAR artifact
+- Package both Spring Boot applications
+- Build backend and gateway Docker images
+- Archive both generated JAR artifacts
 
 Expected Jenkins tool names:
 
@@ -162,6 +196,8 @@ Docker images are tagged as:
 ```text
 blog-app-apis:<jenkins-build-number>
 blog-app-apis:latest
+blog-api-gateway:<jenkins-build-number>
+blog-api-gateway:latest
 ```
 
 Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
@@ -181,6 +217,8 @@ Important variables:
 - `JWT_SECRET`
 - `JWT_EXPIRATION_MS`
 - `CORS_ALLOWED_ORIGINS`
+- `GATEWAY_PORT`
+- `BACKEND_BASE_URL` (manual non-Docker gateway runs)
 
 ## API Documentation
 
@@ -193,18 +231,18 @@ OpenAPI documentation is generated by springdoc:
 
 ## Operational Endpoints
 
-Spring Boot Actuator exposes only safe public endpoints by default:
+The API Gateway exposes only safe public Actuator endpoints by default:
 
 ```text
 /actuator/health
 /actuator/info
 ```
 
-These endpoints are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations.
+These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations. The backend has its own internal container healthcheck.
 
 ## Production Readiness
 
-The backend is ready for the first live portfolio deployment as a Dockerized monolith.
+The platform is ready for a gateway-fronted portfolio deployment using Docker Compose.
 
 Important deployment behavior:
 
@@ -230,7 +268,9 @@ Recommended checks before deployment:
 
 ```bash
 mvn test
+mvn -f gateway-service/pom.xml test
 mvn dependency:tree
+mvn -f gateway-service/pom.xml dependency:tree
 ```
 
 Security-related improvements already applied:
@@ -247,7 +287,7 @@ Security-related improvements already applied:
 
 The planned deployment path is incremental and cost-aware:
 
-1. Deploy the current Dockerized monolith as the first stable AWS baseline.
+1. Deploy the gateway-fronted modular monolith as the stable AWS baseline.
 2. Store runtime configuration as environment variables.
 3. Add a Docker image registry push stage in Jenkins.
 4. Deploy the backend container on a low-cost AWS option.
@@ -267,18 +307,19 @@ The monolith will be split only after the production baseline is stable.
 
 Planned service boundaries:
 
-- API Gateway
+- API Gateway (completed in Phase 2)
 - Auth/User service
 - Post service
 - Category/Comment service
 
 Migration strategy:
 
-1. Keep the current monolith live as the stable baseline.
-2. Extract one bounded context at a time.
-3. Containerize each extracted service independently.
-4. Add service-to-service communication only where needed.
-5. Move toward independent CI/CD pipelines per service.
-6. Add Kubernetes after Docker, Jenkins, AWS, Terraform, and monitoring are already understood.
+1. Keep the gateway-fronted modular monolith live as the stable baseline.
+2. Extract Auth/User as the first independently owned business service.
+3. Route each extracted API group through the existing gateway.
+4. Containerize each extracted service independently.
+5. Add service-to-service communication only where needed.
+6. Move toward independent CI/CD pipelines per service.
+7. Add Kubernetes after Docker, Jenkins, AWS, Terraform, and monitoring are already understood.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.

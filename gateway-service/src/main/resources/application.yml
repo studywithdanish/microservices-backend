@@ -1,0 +1,53 @@
+server:
+  port: ${GATEWAY_PORT:9090}
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-gateway
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: blog-backend
+              uri: ${BACKEND_BASE_URL:http://localhost:9091}
+              predicates:
+                - Path=/api/**,/v3/api-docs,/v3/api-docs/**,/swagger-ui.html,/swagger-ui/**,/webjars/**
+              filters:
+                - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+          globalcors:
+            add-to-simple-url-handler-mapping: true
+            cors-configurations:
+              '[/**]':
+                allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+                allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS
+                allowed-headers: Authorization,Content-Type,Accept,X-Correlation-Id
+                exposed-headers: X-Correlation-Id
+                allow-credentials: true
+                max-age: 3600
+          httpclient:
+            connect-timeout: 3000
+            response-timeout: 30s
+          trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:127\.0\.0\.1|10\..*|172\.(1[6-9]|2[0-9]|3[0-1])\..*|192\.168\..*}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: Blogging Platform API Gateway
+    description: Public routing boundary for incremental microservice extraction
+    version: 2.0.0
