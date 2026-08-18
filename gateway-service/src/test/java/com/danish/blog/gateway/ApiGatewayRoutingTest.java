@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -27,6 +28,9 @@ class ApiGatewayRoutingTest {
     @Autowired
     private WebTestClient webTestClient;
 
+    @LocalServerPort
+    private int gatewayPort;
+
     @BeforeAll
     static void startBackend() {
         ensureBackendStarted();
@@ -43,8 +47,12 @@ class ApiGatewayRoutingTest {
     static void gatewayProperties(DynamicPropertyRegistry registry) {
         ensureBackendStarted();
         registry.add(
-                "spring.cloud.gateway.server.webflux.routes[0].uri",
+                "BACKEND_BASE_URL",
                 () -> "http://localhost:" + backend.getAddress().getPort()
+        );
+        registry.add(
+                "CORS_ALLOWED_ORIGINS",
+                () -> "http://localhost:3000,http://localhost:5173"
         );
     }
 
@@ -94,7 +102,7 @@ class ApiGatewayRoutingTest {
     @Test
     void handlesCorsPreflightAtTheGatewayBoundary() {
         webTestClient.options()
-                .uri("/api/posts")
+                .uri("http://localhost:" + gatewayPort + "/api/posts")
                 .header(HttpHeaders.ORIGIN, "http://localhost:3000")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
                 .exchange()
