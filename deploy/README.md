@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the backend, frontend, MySQL, and Caddy reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, backend, frontend, MySQL, and Caddy reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -8,14 +8,14 @@ The first deployment uses one public origin:
 https://your-domain.com
 ```
 
-Caddy manages HTTPS certificates automatically and routes traffic internally:
+Caddy manages HTTPS certificates automatically. API traffic passes through the gateway before reaching the private backend:
 
 ```text
 /                    -> React frontend
-/api/**              -> Spring Boot backend
-/actuator/**         -> Spring Boot backend
-/swagger-ui/**       -> Spring Boot backend
-/v3/api-docs         -> Spring Boot backend
+/api/**              -> API Gateway -> Spring Boot backend
+/actuator/**         -> API Gateway health endpoints
+/swagger-ui/**       -> API Gateway -> Spring Boot backend
+/v3/api-docs         -> API Gateway -> Spring Boot backend
 ```
 
 This keeps the first deployment cost-effective and avoids managing a separate API subdomain before it is needed.
@@ -126,6 +126,7 @@ Check logs:
 
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env logs -f backend
+docker compose -f docker-compose.prod.yml --env-file .env logs -f gateway
 docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
 ```
 
@@ -194,7 +195,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Caddy is the public entry point, manages HTTPS automatically, and routes frontend and backend traffic internally. The backend runs with the production profile, uses Flyway for database schema versioning, and stores secrets in environment variables. MySQL data, uploaded images, and TLS certificate data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost, while keeping the architecture ready for Jenkins CD, Terraform, monitoring, and later Kubernetes migration.
+I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Caddy terminates HTTPS, the API Gateway provides a stable routing and correlation boundary, and the backend remains private on the Docker network. The backend runs with the production profile, uses Flyway for database schema versioning, and stores secrets in environment variables. This gateway seam lets me extract one service at a time without changing the frontend URL. MySQL data, uploaded images, and TLS certificate data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later service extraction and infrastructure automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 

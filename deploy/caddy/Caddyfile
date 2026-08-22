@@ -12,23 +12,23 @@
     }
 
     handle /api/* {
-        reverse_proxy backend:9090
+        reverse_proxy gateway:9090
     }
 
     handle /actuator/* {
-        reverse_proxy backend:9090
+        reverse_proxy gateway:9090
     }
 
     handle /v3/api-docs* {
-        reverse_proxy backend:9090
+        reverse_proxy gateway:9090
     }
 
     handle /swagger-ui/* {
-        reverse_proxy backend:9090
+        reverse_proxy gateway:9090
     }
 
     handle /swagger-ui.html {
-        reverse_proxy backend:9090
+        reverse_proxy gateway:9090
     }
 
     handle {
