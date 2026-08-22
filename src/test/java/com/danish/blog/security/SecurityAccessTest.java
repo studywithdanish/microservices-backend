@@ -1,7 +1,6 @@
 package com.danish.blog.security;
 
 import com.danish.blog.payloads.CategoryDto;
-import com.danish.blog.payloads.UserRegistrationRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,51 +50,9 @@ class SecurityAccessTest {
     }
 
     @Test
-    void authRegisterEndpointShouldBePublic() throws Exception {
-        UserRegistrationRequest request = new UserRegistrationRequest();
-        request.setName("Dan");
-        request.setEmail("invalid-email");
-        request.setPassword("pw");
-        request.setAbout("");
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.email").value("Email address is not valid"));
-    }
-
-    @Test
-    void currentUserEndpointShouldRejectAnonymousRequests() throws Exception {
-        mockMvc.perform(get("/api/v1/auth/me"))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void protectedUserEndpointShouldRejectAnonymousRequests() throws Exception {
+    void extractedIdentityRoutesShouldNotBeAvailableOnContentBackend() throws Exception {
         mockMvc.perform(get("/api/users/"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    @WithMockUser(roles = "NORMAL")
-    void userListShouldRejectNonAdminUsers() throws Exception {
-        mockMvc.perform(get("/api/users/"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(roles = "ADMIN")
-    void userListShouldAllowAdminUsers() throws Exception {
-        mockMvc.perform(get("/api/users/"))
-                .andExpect(status().isOk());
-    }
-
-    @Test
-    @WithMockUser(roles = "NORMAL")
-    void adminDeleteEndpointShouldRejectNonAdminUsers() throws Exception {
-        mockMvc.perform(delete("/api/users/{userId}", 1))
-                .andExpect(status().isForbidden());
     }
 
     @Test

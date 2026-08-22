@@ -4,14 +4,21 @@ Spring Boot backend APIs for a blogging platform. The project is being modernize
 
 ## Current Architecture
 
-The current backend is in the transitional gateway phase of an incremental microservices migration. Spring Cloud Gateway is the public API entry point, while the Phase 1 modular monolith remains the private downstream application for blog, category, comment, user, and authentication APIs.
+Phase 3 extracts identity and user management as the first independently deployable business service. Spring Cloud Gateway remains the only public API entry point, so the frontend keeps the same URLs while the gateway selects the correct downstream service.
 
-This is intentional: routing is separated before business capabilities are extracted, so the frontend can keep one stable base URL while individual API groups move to new services later.
+```text
+Frontend -> API Gateway :9090
+              |-> Identity Service :9092 -> Identity MySQL
+              `-> Content Backend :9090  -> Content MySQL
+```
 
 High-level structure:
 
 - Spring Cloud Gateway owns the public API boundary on port `9090`
-- The backend is private inside Docker and continues to enforce JWT authorization
+- The Identity Service owns users, credentials, roles, registration, login, and JWT issuance
+- The content backend validates identity claims locally and does not query identity data
+- Each business service has its own Flyway-managed MySQL database
+- Both downstream services are private inside Docker and enforce their own authorization
 - Controllers expose REST APIs from the current backend
 - Services contain business logic
 - Repositories handle persistence through Spring Data JPA
@@ -40,6 +47,7 @@ Completed improvements:
 - Refactored services and controllers to constructor injection
 - Completed Phase 1 microservice-readiness boundaries and ownership controls
 - Completed Phase 2 API Gateway routing, correlation IDs, failure handling, Docker integration, and CI coverage
+- Completed Phase 3 Identity Service extraction, database ownership, gateway routing, and claim-based downstream authorization
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -86,7 +94,22 @@ Implemented gateway capabilities:
 - Independent gateway tests, Maven build, Docker image, and Jenkins stages
 - Production Caddy routing through the gateway instead of directly to the backend
 
-Authentication and resource authorization intentionally remain in the backend during this phase. The next extraction can route only Auth/User endpoints to an Identity Service while every other route continues to use the current backend.
+Phase 2 deliberately retained authentication in the backend. Phase 3 completes the next strangler step described below.
+
+## Phase 3: Identity Service Extraction
+
+The first business capability now runs as a standalone Spring Boot service:
+
+- `/api/v1/auth/**` and `/api/users/**` route to the Identity Service
+- All other `/api/**` requests continue to route to the content backend
+- Existing frontend URLs and JSON contracts are preserved
+- The Identity Service owns a separate `blog_identity` schema and Flyway history
+- Password hashing, credential checks, roles, user profiles, and JWT issuance were removed from the content backend
+- JWTs carry signed `userId`, email subject, and role claims
+- The content backend authorizes ownership from verified claims without a cross-service database lookup
+- Docker Compose, production Compose, Jenkins, health checks, and automated tests cover the new service
+
+The detailed rollout, data migration, rollback, and smoke-test guide is in [Phase 3 Identity Service](docs/phase-3-identity-service.md).
 
 ## Tech Stack
 
@@ -113,7 +136,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start MySQL, the backend, and the gateway:
+Start both databases, both business services, and the gateway:
 
 ```bash
 docker compose up --build
@@ -164,6 +187,12 @@ mvn test
 
 Tests use an isolated H2 database profile and do not require local MySQL.
 
+Run the Identity Service tests independently:
+
+```bash
+mvn -f identity-service/pom.xml test
+```
+
 Run the gateway tests independently:
 
 ```bash
@@ -178,11 +207,11 @@ Pipeline stages:
 
 - Checkout source code
 - Verify Java and Maven versions
-- Run backend and gateway Maven tests
+- Run backend, Identity Service, and gateway Maven tests
 - Publish JUnit test reports
-- Package both Spring Boot applications
-- Build backend and gateway Docker images
-- Archive both generated JAR artifacts
+- Package all three Spring Boot applications
+- Build backend, Identity Service, and gateway Docker images
+- Archive all generated JAR artifacts
 
 Expected Jenkins tool names:
 
@@ -198,6 +227,8 @@ blog-app-apis:<jenkins-build-number>
 blog-app-apis:latest
 blog-api-gateway:<jenkins-build-number>
 blog-api-gateway:latest
+blog-identity-service:<jenkins-build-number>
+blog-identity-service:latest
 ```
 
 Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
@@ -214,11 +245,15 @@ Important variables:
 - `DB_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
+- `IDENTITY_DB_URL`
+- `IDENTITY_DB_USERNAME`
+- `IDENTITY_DB_PASSWORD`
 - `JWT_SECRET`
 - `JWT_EXPIRATION_MS`
 - `CORS_ALLOWED_ORIGINS`
 - `GATEWAY_PORT`
 - `BACKEND_BASE_URL` (manual non-Docker gateway runs)
+- `IDENTITY_BASE_URL` (manual non-Docker gateway runs)
 
 ## API Documentation
 
@@ -268,8 +303,10 @@ Recommended checks before deployment:
 
 ```bash
 mvn test
+mvn -f identity-service/pom.xml test
 mvn -f gateway-service/pom.xml test
 mvn dependency:tree
+mvn -f identity-service/pom.xml dependency:tree
 mvn -f gateway-service/pom.xml dependency:tree
 ```
 
@@ -279,7 +316,9 @@ Security-related improvements already applied:
 - BCrypt password encoding
 - JWT secret externalized through `JWT_SECRET`
 - Stateless Spring Security filter chain
-- Public endpoints explicitly whitelisted
+- Public endpoints explicitly whitelisted in each service
+- Identity data is no longer shared with the content database
+- Downstream authorization uses verified JWT identity and role claims
 - Production schema managed by Flyway instead of Hibernate auto-create
 - Health endpoint available for Docker, CI/CD, and AWS checks
 
@@ -287,13 +326,12 @@ Security-related improvements already applied:
 
 The planned deployment path is incremental and cost-aware:
 
-1. Deploy the gateway-fronted modular monolith as the stable AWS baseline.
+1. Deploy the gateway, Identity Service, and content backend as the stable AWS baseline.
 2. Store runtime configuration as environment variables.
 3. Add a Docker image registry push stage in Jenkins.
-4. Deploy the backend container on a low-cost AWS option.
-5. Add Terraform for repeatable infrastructure.
-6. Add centralized logs and basic metrics.
-7. Add Prometheus and Grafana after the live deployment is stable.
+4. Add Terraform for repeatable infrastructure.
+5. Add centralized logs and basic metrics.
+6. Add Prometheus and Grafana after the live deployment is stable.
 
 The production Docker Compose and AWS runbook are available in:
 
@@ -308,18 +346,18 @@ The monolith will be split only after the production baseline is stable.
 Planned service boundaries:
 
 - API Gateway (completed in Phase 2)
-- Auth/User service
+- Identity/Auth/User service (completed in Phase 3)
 - Post service
 - Category/Comment service
 
 Migration strategy:
 
 1. Keep the gateway-fronted modular monolith live as the stable baseline.
-2. Extract Auth/User as the first independently owned business service.
-3. Route each extracted API group through the existing gateway.
-4. Containerize each extracted service independently.
-5. Add service-to-service communication only where needed.
-6. Move toward independent CI/CD pipelines per service.
+2. Extract Auth/User as the first independently owned business service (completed).
+3. Extract content capabilities behind the existing gateway one route group at a time.
+4. Add service-to-service communication only where needed.
+5. Move toward independent CI/CD pipelines per service.
+6. Replace the shared HMAC key with asymmetric signing and public-key/JWKS verification.
 7. Add Kubernetes after Docker, Jenkins, AWS, Terraform, and monitoring are already understood.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.
