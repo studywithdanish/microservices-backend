@@ -1,5 +1,6 @@
 HELP.md
 target/
+/phase3-target/
 .env
 .env.*
 !.env.example

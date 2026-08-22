@@ -16,6 +16,7 @@ pipeline {
         MAVEN_OPTS = '-Dmaven.repo.local=.m2/repository'
         BACKEND_IMAGE_NAME = 'blog-app-apis'
         GATEWAY_IMAGE_NAME = 'blog-api-gateway'
+        IDENTITY_IMAGE_NAME = 'blog-identity-service'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -61,11 +62,25 @@ pipeline {
             }
         }
 
+        stage('Test Identity Service') {
+            steps {
+                script {
+                    runCommand('mvn -f identity-service/pom.xml clean test')
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'identity-service/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
         stage('Package Applications') {
             steps {
                 script {
                     runCommand('mvn package -DskipTests')
                     runCommand('mvn -f gateway-service/pom.xml package -DskipTests')
+                    runCommand('mvn -f identity-service/pom.xml package -DskipTests')
                 }
             }
         }
@@ -76,6 +91,7 @@ pipeline {
                     runCommand('docker --version')
                     runCommand("docker build -t ${BACKEND_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${BACKEND_IMAGE_NAME}:latest .")
                     runCommand("docker build -t ${GATEWAY_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${GATEWAY_IMAGE_NAME}:latest gateway-service")
+                    runCommand("docker build -t ${IDENTITY_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${IDENTITY_IMAGE_NAME}:latest identity-service")
                 }
             }
         }
@@ -83,7 +99,7 @@ pipeline {
 
     post {
         success {
-            archiveArtifacts artifacts: 'target/*.jar,gateway-service/target/*.jar', fingerprint: true
+            archiveArtifacts artifacts: 'target/*.jar,gateway-service/target/*.jar,identity-service/target/*.jar', fingerprint: true
         }
         cleanup {
             cleanWs(deleteDirs: true, disableDeferredWipeout: true)

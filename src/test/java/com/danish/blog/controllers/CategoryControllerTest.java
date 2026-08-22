@@ -3,7 +3,6 @@ package com.danish.blog.controllers;
 import com.danish.blog.exceptions.GlobalExceptionHandler;
 import com.danish.blog.exceptions.ResourceNotFoundException;
 import com.danish.blog.payloads.CategoryDto;
-import com.danish.blog.repositories.RoleRepo;
 import com.danish.blog.security.JwtTokenHelper;
 import com.danish.blog.services.CategoryService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,7 +12,6 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,13 +44,7 @@ class CategoryControllerTest {
     private CategoryService categoryService;
 
     @MockitoBean
-    private RoleRepo roleRepo;
-
-    @MockitoBean
     private JwtTokenHelper jwtTokenHelper;
-
-    @MockitoBean
-    private UserDetailsService userDetailsService;
 
     @Test
     void getAllCategoriesShouldReturnCategories() throws Exception {

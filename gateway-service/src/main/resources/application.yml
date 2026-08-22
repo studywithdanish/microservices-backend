@@ -12,6 +12,13 @@ spring:
       server:
         webflux:
           routes:
+            - id: identity-service
+              order: -10
+              uri: ${IDENTITY_BASE_URL:http://localhost:9092}
+              predicates:
+                - Path=/api/v1/auth/**,/api/users,/api/users/**
+              filters:
+                - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
             - id: blog-backend
               uri: ${BACKEND_BASE_URL:http://localhost:9091}
               predicates:
@@ -40,4 +47,4 @@ info:
   app:
     name: Blogging Platform API Gateway
     description: Public routing boundary for incremental microservice extraction
-    version: 2.0.0
+    version: 3.0.0

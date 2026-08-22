@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 class ApiGatewayRoutingTest {
 
     private static HttpServer backend;
+    private static HttpServer identityService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -41,6 +42,9 @@ class ApiGatewayRoutingTest {
         if (backend != null) {
             backend.stop(0);
         }
+        if (identityService != null) {
+            identityService.stop(0);
+        }
     }
 
     @DynamicPropertySource
@@ -49,6 +53,10 @@ class ApiGatewayRoutingTest {
         registry.add(
                 "BACKEND_BASE_URL",
                 () -> "http://localhost:" + backend.getAddress().getPort()
+        );
+        registry.add(
+                "IDENTITY_BASE_URL",
+                () -> "http://localhost:" + identityService.getAddress().getPort()
         );
         registry.add(
                 "CORS_ALLOWED_ORIGINS",
@@ -66,7 +74,27 @@ class ApiGatewayRoutingTest {
                 .expectStatus().isOk()
                 .expectHeader().valueEquals(CorrelationIdFilter.CORRELATION_ID_HEADER, "request-123")
                 .expectBody(String.class)
-                .isEqualTo("GET|/api/posts?pageNo=0|Bearer phase-2-token|request-123");
+                .isEqualTo("backend|GET|/api/posts?pageNo=0|Bearer phase-2-token|request-123");
+    }
+
+    @Test
+    void routesAuthenticationAndUserApisToIdentityService() {
+        webTestClient.post()
+                .uri("/api/v1/auth/register")
+                .header(CorrelationIdFilter.CORRELATION_ID_HEADER, "identity-request")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .isEqualTo("identity|POST|/api/v1/auth/register||identity-request");
+
+        webTestClient.get()
+                .uri("/api/users/7")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer identity-token")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("identity|GET|/api/users/7|Bearer identity-token|"));
     }
 
     @Test
@@ -120,19 +148,23 @@ class ApiGatewayRoutingTest {
         }
         try {
             backend = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-            backend.createContext("/", ApiGatewayRoutingTest::echoRequest);
+            backend.createContext("/", exchange -> echoRequest(exchange, "backend"));
             backend.start();
+            identityService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+            identityService.createContext("/", exchange -> echoRequest(exchange, "identity"));
+            identityService.start();
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to start test backend", exception);
         }
     }
 
-    private static void echoRequest(HttpExchange exchange) throws IOException {
+    private static void echoRequest(HttpExchange exchange, String service) throws IOException {
         String authorization = exchange.getRequestHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         String correlationId = exchange.getRequestHeaders()
                 .getFirst(CorrelationIdFilter.CORRELATION_ID_HEADER);
         String body = String.join(
                 "|",
+                service,
                 exchange.getRequestMethod(),
                 exchange.getRequestURI().toString(),
                 valueOrEmpty(authorization),
