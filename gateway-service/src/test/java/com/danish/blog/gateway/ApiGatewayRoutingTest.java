@@ -25,6 +25,7 @@ class ApiGatewayRoutingTest {
 
     private static HttpServer backend;
     private static HttpServer identityService;
+    private static HttpServer postService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -45,6 +46,9 @@ class ApiGatewayRoutingTest {
         if (identityService != null) {
             identityService.stop(0);
         }
+        if (postService != null) {
+            postService.stop(0);
+        }
     }
 
     @DynamicPropertySource
@@ -59,13 +63,17 @@ class ApiGatewayRoutingTest {
                 () -> "http://localhost:" + identityService.getAddress().getPort()
         );
         registry.add(
+                "POST_SERVICE_BASE_URL",
+                () -> "http://localhost:" + postService.getAddress().getPort()
+        );
+        registry.add(
                 "CORS_ALLOWED_ORIGINS",
                 () -> "http://localhost:3000,http://localhost:5173"
         );
     }
 
     @Test
-    void routesApiRequestAndPreservesSecurityHeaders() {
+    void routesPostRequestAndPreservesSecurityHeaders() {
         webTestClient.get()
                 .uri("/api/posts?pageNo=0")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer phase-2-token")
@@ -74,7 +82,18 @@ class ApiGatewayRoutingTest {
                 .expectStatus().isOk()
                 .expectHeader().valueEquals(CorrelationIdFilter.CORRELATION_ID_HEADER, "request-123")
                 .expectBody(String.class)
-                .isEqualTo("backend|GET|/api/posts?pageNo=0|Bearer phase-2-token|request-123");
+                .isEqualTo("post|GET|/api/posts?pageNo=0|Bearer phase-2-token|request-123");
+    }
+
+    @Test
+    void keepsCommentRoutesOnTheRemainingBackend() {
+        webTestClient.get()
+                .uri("/api/posts/10/comments")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("backend|GET|/api/posts/10/comments|"));
     }
 
     @Test
@@ -153,6 +172,9 @@ class ApiGatewayRoutingTest {
             identityService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             identityService.createContext("/", exchange -> echoRequest(exchange, "identity"));
             identityService.start();
+            postService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+            postService.createContext("/", exchange -> echoRequest(exchange, "post"));
+            postService.start();
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to start test backend", exception);
         }

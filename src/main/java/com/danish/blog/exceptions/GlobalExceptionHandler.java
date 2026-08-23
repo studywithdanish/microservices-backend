@@ -48,4 +48,10 @@ public class GlobalExceptionHandler {
         ApiResponse apiResponse = new ApiResponse(ex.getMessage(), false);
         return new ResponseEntity<>(apiResponse, HttpStatus.FORBIDDEN);
     }
+
+    @ExceptionHandler(PostServiceUnavailableException.class)
+    public ResponseEntity<ApiResponse> handlePostServiceUnavailable(PostServiceUnavailableException ex) {
+        ApiResponse apiResponse = new ApiResponse(ex.getMessage(), false);
+        return new ResponseEntity<>(apiResponse, HttpStatus.SERVICE_UNAVAILABLE);
+    }
 }

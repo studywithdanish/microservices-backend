@@ -1,12 +1,12 @@
 package com.danish.blog.services.impl;
 
+import com.danish.blog.clients.PostReferenceClient;
 import com.danish.blog.entities.Comment;
 import com.danish.blog.exceptions.ResourceNotFoundException;
 import com.danish.blog.payloads.CommentCreateRequest;
 import com.danish.blog.payloads.CommentDto;
 import com.danish.blog.repositories.CommentRepo;
 import com.danish.blog.security.AuthenticatedUser;
-import com.danish.blog.services.PostService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,19 +32,19 @@ class CommentServiceImplTest {
     private CommentRepo commentRepo;
 
     @Mock
-    private PostService postService;
+    private PostReferenceClient postReferenceClient;
 
     private CommentServiceImpl commentService;
 
     @BeforeEach
     void setUp() {
-        commentService = new CommentServiceImpl(commentRepo, postService);
+        commentService = new CommentServiceImpl(commentRepo, postReferenceClient);
     }
 
     @Test
     void createCommentShouldStorePostAndAuthenticatedAuthorIds() {
         CommentCreateRequest request = request();
-        when(postService.existsById(10)).thenReturn(true);
+        when(postReferenceClient.existsById(10)).thenReturn(true);
         when(commentRepo.save(any(Comment.class))).thenAnswer(invocation -> {
             Comment saved = invocation.getArgument(0);
             saved.setId(7);
@@ -66,7 +66,7 @@ class CommentServiceImplTest {
 
     @Test
     void createCommentShouldRejectMissingPost() {
-        when(postService.existsById(99)).thenReturn(false);
+        when(postReferenceClient.existsById(99)).thenReturn(false);
 
         assertThatThrownBy(() -> commentService.createComment(
                 request(),
@@ -102,7 +102,7 @@ class CommentServiceImplTest {
 
     @Test
     void getCommentsShouldReturnPostCommentsInRepositoryOrder() {
-        when(postService.existsById(10)).thenReturn(true);
+        when(postReferenceClient.existsById(10)).thenReturn(true);
         when(commentRepo.findByPostIdOrderByIdAsc(10)).thenReturn(List.of(comment(7, 10, 1)));
 
         List<CommentDto> result = commentService.getCommentsByPost(10);

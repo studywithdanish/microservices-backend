@@ -56,6 +56,12 @@ class SecurityAccessTest {
     }
 
     @Test
+    void extractedPostRoutesShouldNotBeAvailableOnContentBackend() throws Exception {
+        mockMvc.perform(get("/api/posts"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void protectedCategoryCreateEndpointShouldRejectAnonymousRequests() throws Exception {
         CategoryDto request = new CategoryDto();
         request.setCategoryTitle("Cloud");

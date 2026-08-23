@@ -1,5 +1,6 @@
 package com.danish.blog.services.impl;
 
+import com.danish.blog.clients.PostReferenceClient;
 import com.danish.blog.entities.Comment;
 import com.danish.blog.exceptions.ResourceNotFoundException;
 import com.danish.blog.payloads.CommentCreateRequest;
@@ -7,7 +8,6 @@ import com.danish.blog.payloads.CommentDto;
 import com.danish.blog.repositories.CommentRepo;
 import com.danish.blog.security.AuthenticatedUser;
 import com.danish.blog.services.CommentService;
-import com.danish.blog.services.PostService;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,17 +19,17 @@ import java.util.List;
 public class CommentServiceImpl implements CommentService {
 
     private final CommentRepo commentRepo;
-    private final PostService postService;
+    private final PostReferenceClient postReferenceClient;
 
-    public CommentServiceImpl(CommentRepo commentRepo, PostService postService) {
+    public CommentServiceImpl(CommentRepo commentRepo, PostReferenceClient postReferenceClient) {
         this.commentRepo = commentRepo;
-        this.postService = postService;
+        this.postReferenceClient = postReferenceClient;
     }
 
     @Override
     public CommentDto createComment(CommentCreateRequest request, Integer postId, AuthenticatedUser actor) {
         requireAuthenticatedActor(actor);
-        if (!postService.existsById(postId)) {
+        if (!postReferenceClient.existsById(postId)) {
             throw new ResourceNotFoundException("Post", "PostId", postId);
         }
 
@@ -43,7 +43,7 @@ public class CommentServiceImpl implements CommentService {
     @Override
     @Transactional(readOnly = true)
     public List<CommentDto> getCommentsByPost(Integer postId) {
-        if (!postService.existsById(postId)) {
+        if (!postReferenceClient.existsById(postId)) {
             throw new ResourceNotFoundException("Post", "PostId", postId);
         }
         return commentRepo.findByPostIdOrderByIdAsc(postId).stream().map(this::toDto).toList();
