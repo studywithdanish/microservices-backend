@@ -37,6 +37,25 @@ services:
       timeout: 5s
       retries: 10
 
+  post-mysql:
+    image: mysql:8.4
+    container_name: blog-post-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${POST_MYSQL_DATABASE:-blog_posts}
+      MYSQL_USER: ${POST_DB_USERNAME:-post_user}
+      MYSQL_PASSWORD: ${POST_DB_PASSWORD:-post_password}
+      MYSQL_ROOT_PASSWORD: ${POST_MYSQL_ROOT_PASSWORD:-post_root_password}
+    ports:
+      - "${POST_MYSQL_PORT:-3308}:3306"
+    volumes:
+      - post_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: .
@@ -52,11 +71,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-blog_password}
       JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-before-production-change-this-dev-secret-before-production}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-18000000}
+      POST_SERVICE_BASE_URL: http://post-service:9093
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-this-internal-dev-token-before-production-change-this-internal-dev-token}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     expose:
       - "9090"
-    volumes:
-      - uploaded_images:/app/images
     restart: unless-stopped
 
   identity-service:
@@ -79,6 +98,30 @@ services:
       - "9092"
     restart: unless-stopped
 
+  post-service:
+    build:
+      context: ./post-service
+      dockerfile: Dockerfile
+    container_name: blog-post-service
+    depends_on:
+      post-mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      POST_DB_URL: jdbc:mysql://post-mysql:3306/${POST_MYSQL_DATABASE:-blog_posts}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      POST_DB_USERNAME: ${POST_DB_USERNAME:-post_user}
+      POST_DB_PASSWORD: ${POST_DB_PASSWORD:-post_password}
+      CATEGORY_SERVICE_BASE_URL: http://backend:9090
+      JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-before-production-change-this-dev-secret-before-production}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-change-this-internal-dev-token-before-production-change-this-internal-dev-token}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      POST_IMAGE_PATH: /app/images/
+    expose:
+      - "9093"
+    volumes:
+      - uploaded_images:/app/images
+    restart: unless-stopped
+
   gateway:
     build:
       context: ./gateway-service
@@ -89,9 +132,12 @@ services:
         condition: service_healthy
       identity-service:
         condition: service_healthy
+      post-service:
+        condition: service_healthy
     environment:
       BACKEND_BASE_URL: http://backend:9090
       IDENTITY_BASE_URL: http://identity-service:9092
+      POST_SERVICE_BASE_URL: http://post-service:9093
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "${GATEWAY_PORT:-9090}:9090"
@@ -100,4 +146,5 @@ services:
 volumes:
   mysql_data:
   identity_mysql_data:
+  post_mysql_data:
   uploaded_images:

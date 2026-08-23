@@ -4,21 +4,24 @@ Spring Boot backend APIs for a blogging platform. The project is being modernize
 
 ## Current Architecture
 
-Phase 3 extracts identity and user management as the first independently deployable business service. Spring Cloud Gateway remains the only public API entry point, so the frontend keeps the same URLs while the gateway selects the correct downstream service.
+Phase 4 extracts posts and images as the second independently deployable business service. Spring Cloud Gateway remains the only public API entry point, so the frontend keeps the same URLs while the gateway selects the correct downstream service.
 
 ```text
 Frontend -> API Gateway :9090
               |-> Identity Service :9092 -> Identity MySQL
-              `-> Content Backend :9090  -> Content MySQL
+              |-> Post Service :9093     -> Post MySQL + image volume
+              `-> Remaining Backend      -> Category/Comment MySQL
 ```
 
 High-level structure:
 
 - Spring Cloud Gateway owns the public API boundary on port `9090`
 - The Identity Service owns users, credentials, roles, registration, login, and JWT issuance
-- The content backend validates identity claims locally and does not query identity data
-- Each business service has its own Flyway-managed MySQL database
-- Both downstream services are private inside Docker and enforce their own authorization
+- The Post Service owns posts, category snapshots, images, and post authorization
+- The remaining backend owns categories and comments while Phase 5 is pending
+- Services validate identity claims locally and do not query identity data
+- Every extracted business service has its own Flyway-managed MySQL database
+- All downstream services are private inside Docker and enforce their own authorization
 - Controllers expose REST APIs from the current backend
 - Services contain business logic
 - Repositories handle persistence through Spring Data JPA
@@ -48,6 +51,7 @@ Completed improvements:
 - Completed Phase 1 microservice-readiness boundaries and ownership controls
 - Completed Phase 2 API Gateway routing, correlation IDs, failure handling, Docker integration, and CI coverage
 - Completed Phase 3 Identity Service extraction, database ownership, gateway routing, and claim-based downstream authorization
+- Completed Phase 4 Post Service extraction, independent post data, image ownership, and private comment integration
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -111,6 +115,22 @@ The first business capability now runs as a standalone Spring Boot service:
 
 The detailed rollout, data migration, rollback, and smoke-test guide is in [Phase 3 Identity Service](docs/phase-3-identity-service.md).
 
+## Phase 4: Post Service Extraction
+
+Posts and post images now run as a standalone service without sharing tables with the remaining backend:
+
+- Existing post, search, user-post, category-post, and image URLs route to the Post Service
+- `/api/posts/{postId}/comments` deliberately remains on the backend until Phase 5
+- Post records live in a separate `blog_posts` database
+- Category details are copied into an immutable post snapshot when a post is created
+- The Post Service validates categories through the backend API instead of reading category tables
+- The Comment module checks post existence through a private token-protected endpoint
+- The legacy comments-to-posts database foreign key is removed by Flyway migration `V3`
+- Legacy post tables remain temporarily for rollback but are no longer mapped at runtime
+- JWT owner-or-admin rules and safe image validation moved with the capability
+
+See [Phase 4 Post Service](docs/phase-4-post-service.md) for route ownership, migration, rollback, and smoke tests.
+
 ## Tech Stack
 
 - Java 17
@@ -136,7 +156,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start both databases, both business services, and the gateway:
+Start all three databases, the three business services, and the gateway:
 
 ```bash
 docker compose up --build
@@ -193,6 +213,12 @@ Run the Identity Service tests independently:
 mvn -f identity-service/pom.xml test
 ```
 
+Run the Post Service tests independently:
+
+```bash
+mvn -f post-service/pom.xml test
+```
+
 Run the gateway tests independently:
 
 ```bash
@@ -207,10 +233,10 @@ Pipeline stages:
 
 - Checkout source code
 - Verify Java and Maven versions
-- Run backend, Identity Service, and gateway Maven tests
+- Run backend, Identity Service, Post Service, and gateway Maven tests
 - Publish JUnit test reports
-- Package all three Spring Boot applications
-- Build backend, Identity Service, and gateway Docker images
+- Package all four Spring Boot applications
+- Build backend, Identity Service, Post Service, and gateway Docker images
 - Archive all generated JAR artifacts
 
 Expected Jenkins tool names:
@@ -229,6 +255,8 @@ blog-api-gateway:<jenkins-build-number>
 blog-api-gateway:latest
 blog-identity-service:<jenkins-build-number>
 blog-identity-service:latest
+blog-post-service:<jenkins-build-number>
+blog-post-service:latest
 ```
 
 Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
@@ -248,12 +276,18 @@ Important variables:
 - `IDENTITY_DB_URL`
 - `IDENTITY_DB_USERNAME`
 - `IDENTITY_DB_PASSWORD`
+- `POST_DB_URL`
+- `POST_DB_USERNAME`
+- `POST_DB_PASSWORD`
 - `JWT_SECRET`
+- `INTERNAL_SERVICE_TOKEN`
 - `JWT_EXPIRATION_MS`
 - `CORS_ALLOWED_ORIGINS`
 - `GATEWAY_PORT`
 - `BACKEND_BASE_URL` (manual non-Docker gateway runs)
 - `IDENTITY_BASE_URL` (manual non-Docker gateway runs)
+- `POST_SERVICE_BASE_URL` (manual non-Docker gateway runs)
+- `CATEGORY_SERVICE_BASE_URL` (manual non-Docker Post Service runs)
 
 ## API Documentation
 
@@ -304,9 +338,11 @@ Recommended checks before deployment:
 ```bash
 mvn test
 mvn -f identity-service/pom.xml test
+mvn -f post-service/pom.xml test
 mvn -f gateway-service/pom.xml test
 mvn dependency:tree
 mvn -f identity-service/pom.xml dependency:tree
+mvn -f post-service/pom.xml dependency:tree
 mvn -f gateway-service/pom.xml dependency:tree
 ```
 
@@ -326,7 +362,7 @@ Security-related improvements already applied:
 
 The planned deployment path is incremental and cost-aware:
 
-1. Deploy the gateway, Identity Service, and content backend as the stable AWS baseline.
+1. Deploy the gateway, Identity Service, Post Service, and remaining backend as the stable AWS baseline.
 2. Store runtime configuration as environment variables.
 3. Add a Docker image registry push stage in Jenkins.
 4. Add Terraform for repeatable infrastructure.
@@ -347,7 +383,7 @@ Planned service boundaries:
 
 - API Gateway (completed in Phase 2)
 - Identity/Auth/User service (completed in Phase 3)
-- Post service
+- Post service (completed in Phase 4)
 - Category/Comment service
 
 Migration strategy:

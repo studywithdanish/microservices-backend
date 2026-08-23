@@ -43,12 +43,17 @@ public class SecurityConfig {
     };
 
     public static final String[] PUBLIC_GET_URLS = {
-            "/api/posts",
-            "/api/posts/**",
-            "/api/post/**",
-            "/api/posts/search/**",
-            "/api/category/**",
+            "/api/posts/*/comments",
             "/api/categories/**"
+    };
+
+    public static final String[] EXTRACTED_POST_URLS = {
+            "/api/posts",
+            "/api/posts/search/**",
+            "/api/post/**",
+            "/api/user/*/posts",
+            "/api/user/*/category/*/posts",
+            "/api/category/*/posts"
     };
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
@@ -71,12 +76,13 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(withDefaults())
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(EXTRACTED_POST_URLS).denyAll()
+                        .requestMatchers("/api/v1/auth/**", "/api/users", "/api/users/**").denyAll()
                         .requestMatchers(PUBLIC_URLS).permitAll()
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_URLS).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
-                        .requestMatchers("/api/v1/auth/**", "/api/users", "/api/users/**").denyAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));

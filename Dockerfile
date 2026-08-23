@@ -16,7 +16,7 @@ RUN apt-get update \
 RUN addgroup --system spring && adduser --system --ingroup spring spring
 
 COPY --from=build /workspace/target/*.jar app.jar
-RUN mkdir -p /app/images && chown -R spring:spring /app
+RUN chown spring:spring /app/app.jar
 
 USER spring
 EXPOSE 9090
