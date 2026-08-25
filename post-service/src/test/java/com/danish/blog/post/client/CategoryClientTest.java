@@ -25,12 +25,12 @@ class CategoryClientTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        categoryClient = new CategoryClient(builder, "http://backend:9090");
+        categoryClient = new CategoryClient(builder, "http://content-service:9094");
     }
 
     @Test
-    void loadsCategorySnapshotFromOwningBackend() {
-        server.expect(requestTo("http://backend:9090/api/categories/3"))
+    void loadsCategorySnapshotFromContentService() {
+        server.expect(requestTo("http://content-service:9094/api/categories/3"))
                 .andRespond(withSuccess(
                         "{\"categoryId\":3,\"categoryTitle\":\"Spring\",\"categoryDescription\":\"Articles\"}",
                         MediaType.APPLICATION_JSON
@@ -43,7 +43,7 @@ class CategoryClientTest {
 
     @Test
     void mapsMissingCategoryToNotFound() {
-        server.expect(requestTo("http://backend:9090/api/categories/99"))
+        server.expect(requestTo("http://content-service:9094/api/categories/99"))
                 .andRespond(withResourceNotFound());
 
         assertThatThrownBy(() -> categoryClient.getCategory(99))
@@ -51,8 +51,8 @@ class CategoryClientTest {
     }
 
     @Test
-    void mapsBackendFailureToServiceUnavailable() {
-        server.expect(requestTo("http://backend:9090/api/categories/3"))
+    void mapsContentServiceFailureToServiceUnavailable() {
+        server.expect(requestTo("http://content-service:9094/api/categories/3"))
                 .andRespond(withServerError());
 
         assertThatThrownBy(() -> categoryClient.getCategory(3))

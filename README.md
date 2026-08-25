@@ -1,16 +1,16 @@
 # Microservices Backend
 
-Spring Boot backend APIs for a blogging platform. The project is being modernized from a monolithic blog API into a production-ready backend foundation for platform engineering practice.
+Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
 ## Current Architecture
 
-Phase 4 extracts posts and images as the second independently deployable business service. Spring Cloud Gateway remains the only public API entry point, so the frontend keeps the same URLs while the gateway selects the correct downstream service.
+Phase 5 completes the core monolith-to-microservices migration. Spring Cloud Gateway remains the only public API entry point, so the frontend keeps the same URLs while every business capability is independently deployed and owns its database.
 
 ```text
 Frontend -> API Gateway :9090
               |-> Identity Service :9092 -> Identity MySQL
               |-> Post Service :9093     -> Post MySQL + image volume
-              `-> Remaining Backend      -> Category/Comment MySQL
+              `-> Content Service :9094  -> Content MySQL
 ```
 
 High-level structure:
@@ -18,16 +18,16 @@ High-level structure:
 - Spring Cloud Gateway owns the public API boundary on port `9090`
 - The Identity Service owns users, credentials, roles, registration, login, and JWT issuance
 - The Post Service owns posts, category snapshots, images, and post authorization
-- The remaining backend owns categories and comments while Phase 5 is pending
+- The Content Service owns categories and comments
 - Services validate identity claims locally and do not query identity data
-- Every extracted business service has its own Flyway-managed MySQL database
+- Every business service has its own Flyway-managed MySQL database
 - All downstream services are private inside Docker and enforce their own authorization
-- Controllers expose REST APIs from the current backend
+- The original backend is absent from the active runtime and retained temporarily for rollback
 - Services contain business logic
 - Repositories handle persistence through Spring Data JPA
 - Spring Security protects write/admin operations with JWT-based authentication
 - MySQL is used for local/prod-style runtime, while tests use an isolated H2 profile
-- Docker Compose runs the gateway, private backend, and MySQL for local platform testing
+- Docker Compose runs the gateway, three private business services, and three MySQL databases
 
 ## Engineering Improvements
 
@@ -52,6 +52,7 @@ Completed improvements:
 - Completed Phase 2 API Gateway routing, correlation IDs, failure handling, Docker integration, and CI coverage
 - Completed Phase 3 Identity Service extraction, database ownership, gateway routing, and claim-based downstream authorization
 - Completed Phase 4 Post Service extraction, independent post data, image ownership, and private comment integration
+- Completed Phase 5 Content Service extraction, final database ownership, explicit gateway routing, and backend retirement
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -131,6 +132,21 @@ Posts and post images now run as a standalone service without sharing tables wit
 
 See [Phase 4 Post Service](docs/phase-4-post-service.md) for route ownership, migration, rollback, and smoke tests.
 
+## Phase 5: Content Service Extraction
+
+Categories and Comments now run as the final standalone business service:
+
+- `/api/categories/**`, `/api/posts/{postId}/comments`, and `/api/comments/**` route to Content Service
+- Categories and comments live in a separate `blog_content` database
+- Comments store scalar Post and Identity identifiers instead of cross-database relationships
+- Content Service validates Post IDs through the private token-protected Post Service endpoint
+- Category mutations require administrators; comment deletion requires the owner or an administrator
+- Gateway catch-all routing has been removed, so unknown and private paths are not exposed
+- Post Service resolves new category snapshots through Content Service
+- The old backend and schema are no longer deployed, but remain temporarily available for rollback
+
+See [Phase 5 Content Service](docs/phase-5-content-service.md) for migration, cutover, verification, rollback, and interview guidance.
+
 ## Tech Stack
 
 - Java 17
@@ -156,7 +172,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start all three databases, the three business services, and the gateway:
+Start all three databases, all three business services, and the gateway:
 
 ```bash
 docker compose up --build
@@ -166,12 +182,6 @@ The gateway runs at:
 
 ```text
 http://localhost:9090
-```
-
-Swagger UI is available at:
-
-```text
-http://localhost:9090/swagger-ui/index.html
 ```
 
 Health and application info endpoints are available at:
@@ -202,7 +212,7 @@ docker compose down -v
 ## Run Tests
 
 ```bash
-mvn test
+mvn clean test
 ```
 
 Tests use an isolated H2 database profile and do not require local MySQL.
@@ -210,19 +220,25 @@ Tests use an isolated H2 database profile and do not require local MySQL.
 Run the Identity Service tests independently:
 
 ```bash
-mvn -f identity-service/pom.xml test
+mvn -f identity-service/pom.xml clean test
 ```
 
 Run the Post Service tests independently:
 
 ```bash
-mvn -f post-service/pom.xml test
+mvn -f post-service/pom.xml clean test
+```
+
+Run the Content Service tests independently:
+
+```bash
+mvn -f content-service/pom.xml clean test
 ```
 
 Run the gateway tests independently:
 
 ```bash
-mvn -f gateway-service/pom.xml test
+mvn -f gateway-service/pom.xml clean test
 ```
 
 ## Jenkins Pipeline
@@ -257,6 +273,8 @@ blog-identity-service:<jenkins-build-number>
 blog-identity-service:latest
 blog-post-service:<jenkins-build-number>
 blog-post-service:latest
+blog-content-service:<jenkins-build-number>
+blog-content-service:latest
 ```
 
 Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
@@ -270,28 +288,28 @@ Use `.env.production.example` as the reference for live deployment. Do not commi
 Important variables:
 
 - `SPRING_PROFILES_ACTIVE`
-- `DB_URL`
-- `DB_USERNAME`
-- `DB_PASSWORD`
 - `IDENTITY_DB_URL`
 - `IDENTITY_DB_USERNAME`
 - `IDENTITY_DB_PASSWORD`
 - `POST_DB_URL`
 - `POST_DB_USERNAME`
 - `POST_DB_PASSWORD`
+- `CONTENT_DB_URL`
+- `CONTENT_DB_USERNAME`
+- `CONTENT_DB_PASSWORD`
 - `JWT_SECRET`
 - `INTERNAL_SERVICE_TOKEN`
 - `JWT_EXPIRATION_MS`
 - `CORS_ALLOWED_ORIGINS`
 - `GATEWAY_PORT`
-- `BACKEND_BASE_URL` (manual non-Docker gateway runs)
 - `IDENTITY_BASE_URL` (manual non-Docker gateway runs)
 - `POST_SERVICE_BASE_URL` (manual non-Docker gateway runs)
+- `CONTENT_SERVICE_BASE_URL` (manual non-Docker gateway runs)
 - `CATEGORY_SERVICE_BASE_URL` (manual non-Docker Post Service runs)
 
 ## API Documentation
 
-OpenAPI documentation is generated by springdoc:
+Each MVC business service generates OpenAPI documentation through springdoc when run directly:
 
 ```text
 /v3/api-docs
@@ -307,7 +325,7 @@ The API Gateway exposes only safe public Actuator endpoints by default:
 /actuator/info
 ```
 
-These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations. The backend has its own internal container healthcheck.
+These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations. Each private service also has its own container healthcheck.
 
 ## Production Readiness
 
@@ -339,10 +357,12 @@ Recommended checks before deployment:
 mvn test
 mvn -f identity-service/pom.xml test
 mvn -f post-service/pom.xml test
+mvn -f content-service/pom.xml test
 mvn -f gateway-service/pom.xml test
 mvn dependency:tree
 mvn -f identity-service/pom.xml dependency:tree
 mvn -f post-service/pom.xml dependency:tree
+mvn -f content-service/pom.xml dependency:tree
 mvn -f gateway-service/pom.xml dependency:tree
 ```
 
@@ -362,7 +382,7 @@ Security-related improvements already applied:
 
 The planned deployment path is incremental and cost-aware:
 
-1. Deploy the gateway, Identity Service, Post Service, and remaining backend as the stable AWS baseline.
+1. Deploy the gateway, Identity Service, Post Service, and Content Service as the stable AWS baseline.
 2. Store runtime configuration as environment variables.
 3. Add a Docker image registry push stage in Jenkins.
 4. Add Terraform for repeatable infrastructure.
@@ -375,25 +395,25 @@ The production Docker Compose and AWS runbook are available in:
 deploy/
 ```
 
-## Microservices Migration Roadmap
+## Microservices Migration Status
 
-The monolith will be split only after the production baseline is stable.
+The core strangler migration is complete. The original backend source and data are retained only as temporary rollback assets and are absent from the active runtime.
 
-Planned service boundaries:
+Implemented service boundaries:
 
 - API Gateway (completed in Phase 2)
 - Identity/Auth/User service (completed in Phase 3)
 - Post service (completed in Phase 4)
-- Category/Comment service
+- Category/Comment service (completed in Phase 5)
 
-Migration strategy:
+Implemented migration strategy:
 
-1. Keep the gateway-fronted modular monolith live as the stable baseline.
+1. Kept the gateway-fronted modular monolith live while each route group moved.
 2. Extract Auth/User as the first independently owned business service (completed).
-3. Extract content capabilities behind the existing gateway one route group at a time.
-4. Add service-to-service communication only where needed.
-5. Move toward independent CI/CD pipelines per service.
-6. Replace the shared HMAC key with asymmetric signing and public-key/JWKS verification.
-7. Add Kubernetes after Docker, Jenkins, AWS, Terraform, and monitoring are already understood.
+3. Extracted Posts and then Categories/Comments behind unchanged gateway URLs.
+4. Added token-protected service-to-service communication only for reference validation.
+5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
+
+Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, centralized observability, and Kubernetes only when operational scale justifies it.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.

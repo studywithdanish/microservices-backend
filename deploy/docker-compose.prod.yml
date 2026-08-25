@@ -1,21 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.4
-    container_name: blog-prod-mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-blog_app_apis}
-      MYSQL_USER: ${DB_USERNAME:-blog_user}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   identity-mysql:
     image: mysql:8.4
     container_name: blog-prod-identity-mysql
@@ -50,28 +33,22 @@ services:
       timeout: 5s
       retries: 10
 
-  backend:
-    build:
-      context: ..
-      dockerfile: Dockerfile
-    container_name: blog-prod-backend
-    depends_on:
-      mysql:
-        condition: service_healthy
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-blog_app_apis}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
-      DB_USERNAME: ${DB_USERNAME:-blog_user}
-      DB_PASSWORD: ${DB_PASSWORD}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-18000000}
-      POST_SERVICE_BASE_URL: http://post-service:9093
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
-      CORS_ALLOWED_ORIGINS: ${PUBLIC_FRONTEND_ORIGIN}
-      SERVER_FORWARD_HEADERS_STRATEGY: framework
-    expose:
-      - "9090"
+  content-mysql:
+    image: mysql:8.4
+    container_name: blog-prod-content-mysql
     restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${CONTENT_MYSQL_DATABASE:-blog_content}
+      MYSQL_USER: ${CONTENT_DB_USERNAME:-content_user}
+      MYSQL_PASSWORD: ${CONTENT_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${CONTENT_MYSQL_ROOT_PASSWORD}
+    volumes:
+      - content_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   identity-service:
     build:
@@ -107,7 +84,7 @@ services:
       POST_DB_URL: jdbc:mysql://post-mysql:3306/${POST_MYSQL_DATABASE:-blog_posts}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       POST_DB_USERNAME: ${POST_DB_USERNAME:-post_user}
       POST_DB_PASSWORD: ${POST_DB_PASSWORD}
-      CATEGORY_SERVICE_BASE_URL: http://backend:9090
+      CATEGORY_SERVICE_BASE_URL: http://content-service:9094
       JWT_SECRET: ${JWT_SECRET}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
       CORS_ALLOWED_ORIGINS: ${PUBLIC_FRONTEND_ORIGIN}
@@ -119,22 +96,46 @@ services:
       - "9093"
     restart: unless-stopped
 
+  content-service:
+    build:
+      context: ../content-service
+      dockerfile: Dockerfile
+    container_name: blog-prod-content-service
+    depends_on:
+      content-mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      CONTENT_DB_URL: jdbc:mysql://content-mysql:3306/${CONTENT_MYSQL_DATABASE:-blog_content}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      CONTENT_DB_USERNAME: ${CONTENT_DB_USERNAME:-content_user}
+      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD}
+      POST_SERVICE_BASE_URL: http://post-service:9093
+      CONTENT_HTTP_CONNECT_TIMEOUT: ${CONTENT_HTTP_CONNECT_TIMEOUT:-2s}
+      CONTENT_HTTP_READ_TIMEOUT: ${CONTENT_HTTP_READ_TIMEOUT:-5s}
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_FRONTEND_ORIGIN}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    expose:
+      - "9094"
+    restart: unless-stopped
+
   gateway:
     build:
       context: ../gateway-service
       dockerfile: Dockerfile
     container_name: blog-prod-api-gateway
     depends_on:
-      backend:
-        condition: service_healthy
       identity-service:
         condition: service_healthy
       post-service:
         condition: service_healthy
+      content-service:
+        condition: service_healthy
     environment:
-      BACKEND_BASE_URL: http://backend:9090
       IDENTITY_BASE_URL: http://identity-service:9092
       POST_SERVICE_BASE_URL: http://post-service:9093
+      CONTENT_SERVICE_BASE_URL: http://content-service:9094
       CORS_ALLOWED_ORIGINS: ${PUBLIC_FRONTEND_ORIGIN}
       SERVER_FORWARD_HEADERS_STRATEGY: framework
     expose:
@@ -177,9 +178,9 @@ services:
     restart: unless-stopped
 
 volumes:
-  mysql_data:
   identity_mysql_data:
   post_mysql_data:
+  content_mysql_data:
   uploaded_images:
   caddy_data:
   caddy_config:
