@@ -23,9 +23,9 @@ import java.nio.charset.StandardCharsets;
 @AutoConfigureWebTestClient
 class ApiGatewayRoutingTest {
 
-    private static HttpServer backend;
     private static HttpServer identityService;
     private static HttpServer postService;
+    private static HttpServer contentService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -40,14 +40,14 @@ class ApiGatewayRoutingTest {
 
     @AfterAll
     static void stopBackend() {
-        if (backend != null) {
-            backend.stop(0);
-        }
         if (identityService != null) {
             identityService.stop(0);
         }
         if (postService != null) {
             postService.stop(0);
+        }
+        if (contentService != null) {
+            contentService.stop(0);
         }
     }
 
@@ -55,16 +55,16 @@ class ApiGatewayRoutingTest {
     static void gatewayProperties(DynamicPropertyRegistry registry) {
         ensureBackendStarted();
         registry.add(
-                "BACKEND_BASE_URL",
-                () -> "http://localhost:" + backend.getAddress().getPort()
-        );
-        registry.add(
                 "IDENTITY_BASE_URL",
                 () -> "http://localhost:" + identityService.getAddress().getPort()
         );
         registry.add(
                 "POST_SERVICE_BASE_URL",
                 () -> "http://localhost:" + postService.getAddress().getPort()
+        );
+        registry.add(
+                "CONTENT_SERVICE_BASE_URL",
+                () -> "http://localhost:" + contentService.getAddress().getPort()
         );
         registry.add(
                 "CORS_ALLOWED_ORIGINS",
@@ -86,14 +86,34 @@ class ApiGatewayRoutingTest {
     }
 
     @Test
-    void keepsCommentRoutesOnTheRemainingBackend() {
+    void routesCommentAndCategoryApisToContentService() {
         webTestClient.get()
                 .uri("/api/posts/10/comments")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(body -> org.assertj.core.api.Assertions.assertThat(body)
-                        .startsWith("backend|GET|/api/posts/10/comments|"));
+                        .startsWith("content|GET|/api/posts/10/comments|"));
+
+        webTestClient.get()
+                .uri("/api/categories/10")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("content|GET|/api/categories/10|"));
+    }
+
+    @Test
+    void preservesIdentityTokenWhenRoutingWritesToContentService() {
+        webTestClient.post()
+                .uri("/api/posts/10/comments")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer identity-token")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("content|POST|/api/posts/10/comments|Bearer identity-token|"));
     }
 
     @Test
@@ -162,19 +182,19 @@ class ApiGatewayRoutingTest {
     }
 
     private static void ensureBackendStarted() {
-        if (backend != null) {
+        if (identityService != null) {
             return;
         }
         try {
-            backend = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-            backend.createContext("/", exchange -> echoRequest(exchange, "backend"));
-            backend.start();
             identityService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             identityService.createContext("/", exchange -> echoRequest(exchange, "identity"));
             identityService.start();
             postService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             postService.createContext("/", exchange -> echoRequest(exchange, "post"));
             postService.start();
+            contentService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+            contentService.createContext("/", exchange -> echoRequest(exchange, "content"));
+            contentService.start();
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to start test backend", exception);
         }

@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the API Gateway, Identity Service, Post Service, remaining backend, frontend, three MySQL databases, and Caddy reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, frontend, three MySQL databases, and Caddy reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -8,7 +8,7 @@ The first deployment uses one public origin:
 https://your-domain.com
 ```
 
-Caddy manages HTTPS certificates automatically. API traffic passes through the gateway before reaching the private backend:
+Caddy manages HTTPS certificates automatically. API traffic passes through the gateway before reaching private services:
 
 ```text
 /                    -> React frontend
@@ -16,11 +16,10 @@ Caddy manages HTTPS certificates automatically. API traffic passes through the g
 /api/users/**         -> API Gateway -> Identity Service -> Identity MySQL
 /api/posts            -> API Gateway -> Post Service -> Post MySQL
 /api/post/**           -> API Gateway -> Post Service -> Post MySQL/images
-/api/posts/*/comments  -> API Gateway -> Remaining backend -> Content MySQL
-/api/categories/**     -> API Gateway -> Remaining backend -> Content MySQL
+/api/posts/*/comments  -> API Gateway -> Content Service -> Content MySQL
+/api/comments/**       -> API Gateway -> Content Service -> Content MySQL
+/api/categories/**     -> API Gateway -> Content Service -> Content MySQL
 /actuator/**         -> API Gateway health endpoints
-/swagger-ui/**       -> API Gateway -> Spring Boot backend
-/v3/api-docs         -> API Gateway -> Spring Boot backend
 ```
 
 This keeps the first deployment cost-effective and avoids managing a separate API subdomain before it is needed.
@@ -101,12 +100,12 @@ PUBLIC_API_BASE_URL=https://your-domain.com
 Use strong values for:
 
 ```text
-MYSQL_ROOT_PASSWORD
-DB_PASSWORD
 IDENTITY_MYSQL_ROOT_PASSWORD
 IDENTITY_DB_PASSWORD
 POST_MYSQL_ROOT_PASSWORD
 POST_DB_PASSWORD
+CONTENT_MYSQL_ROOT_PASSWORD
+CONTENT_DB_PASSWORD
 JWT_SECRET
 INTERNAL_SERVICE_TOKEN
 ```
@@ -135,9 +134,9 @@ docker compose -f docker-compose.prod.yml --env-file .env ps
 Check logs:
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env logs -f backend
 docker compose -f docker-compose.prod.yml --env-file .env logs -f identity-service
 docker compose -f docker-compose.prod.yml --env-file .env logs -f post-service
+docker compose -f docker-compose.prod.yml --env-file .env logs -f content-service
 docker compose -f docker-compose.prod.yml --env-file .env logs -f gateway
 docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
 ```
@@ -149,7 +148,6 @@ Use these URLs:
 ```text
 https://your-domain.com/
 https://your-domain.com/actuator/health
-https://your-domain.com/swagger-ui/index.html
 ```
 
 Then test from the React frontend:
@@ -207,7 +205,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing and correlation boundary. Identity and Posts are independently deployed services with separate databases. The Post Service stores category snapshots and the remaining Comment module verifies post references through a private token-protected API instead of a shared table. Services validate JWT claims locally, remain private on the Docker network, use Flyway, and receive secrets through environment variables. This strangler pattern lets me extract one capability at a time without changing the frontend URL. Database, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later service extraction and infrastructure automation.
+I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing and correlation boundary. Identity, Posts, Categories, and Comments are independently owned across three business services and three databases. Content Service verifies post references through a private token-protected API instead of a shared table. Services validate JWT claims locally, remain private on the Docker network, use Flyway, and receive secrets through environment variables. The final gateway has explicit route ownership and no catch-all legacy backend. Database, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later infrastructure automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 

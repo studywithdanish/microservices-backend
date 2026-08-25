@@ -26,10 +26,11 @@ spring:
                 - Path=/api/posts,/api/posts/search/**,/api/post/**,/api/user/*/posts,/api/user/*/category/*/posts,/api/category/*/posts
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
-            - id: blog-backend
-              uri: ${BACKEND_BASE_URL:http://localhost:9091}
+            - id: content-service
+              order: -4
+              uri: ${CONTENT_SERVICE_BASE_URL:http://localhost:9094}
               predicates:
-                - Path=/api/**,/v3/api-docs,/v3/api-docs/**,/swagger-ui.html,/swagger-ui/**,/webjars/**
+                - Path=/api/categories,/api/categories/**,/api/posts/*/comments,/api/comments/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
           httpclient:
@@ -53,5 +54,5 @@ management:
 info:
   app:
     name: Blogging Platform API Gateway
-    description: Public routing boundary for incremental microservice extraction
-    version: 4.0.0
+    description: Public routing boundary for independently owned blogging services
+    version: 5.0.0
