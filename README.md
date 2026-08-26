@@ -2,15 +2,26 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
+**Status:** the five-phase core migration and local full-stack integration are complete. AWS deployment is intentionally deferred.
+
+Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
+
 ## Current Architecture
 
 Phase 5 completes the core monolith-to-microservices migration. Spring Cloud Gateway remains the only public API entry point, so the frontend keeps the same URLs while every business capability is independently deployed and owns its database.
 
-```text
-Frontend -> API Gateway :9090
-              |-> Identity Service :9092 -> Identity MySQL
-              |-> Post Service :9093     -> Post MySQL + image volume
-              `-> Content Service :9094  -> Content MySQL
+```mermaid
+flowchart LR
+    Frontend[React frontend] --> Gateway[API Gateway :9090]
+    Gateway --> Identity[Identity Service :9092]
+    Gateway --> Post[Post Service :9093]
+    Gateway --> Content[Content Service :9094]
+    Identity --> IdentityDb[(Identity MySQL)]
+    Post --> PostDb[(Post MySQL)]
+    Post --> Images[(Image volume)]
+    Content --> ContentDb[(Content MySQL)]
+    Post -. category validation .-> Content
+    Content -. post validation .-> Post
 ```
 
 High-level structure:
@@ -53,6 +64,17 @@ Completed improvements:
 - Completed Phase 3 Identity Service extraction, database ownership, gateway routing, and claim-based downstream authorization
 - Completed Phase 4 Post Service extraction, independent post data, image ownership, and private comment integration
 - Completed Phase 5 Content Service extraction, final database ownership, explicit gateway routing, and backend retirement
+- Added a safe initial `General` category for an empty Content database so a fresh local environment supports post creation
+- Verified the React registration, login, profile, post, category, and comment flows through the gateway
+
+## Documentation Map
+
+- [Architecture reference](docs/architecture.md) — topology, route/data ownership, security, reliability, and migration sequence
+- [Local end-to-end runbook](docs/local-end-to-end.md) — Docker, React, browser journey, checks, and troubleshooting
+- [Interview and resume guide](docs/interview-and-resume-guide.md) — project pitch, factual resume bullets, design answers, and demo order
+- [Phase 3 Identity extraction](docs/phase-3-identity-service.md)
+- [Phase 4 Post extraction](docs/phase-4-post-service.md)
+- [Phase 5 Content extraction](docs/phase-5-content-service.md)
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -249,10 +271,10 @@ Pipeline stages:
 
 - Checkout source code
 - Verify Java and Maven versions
-- Run backend, Identity Service, Post Service, and gateway Maven tests
+- Run legacy rollback backend plus Gateway, Identity, Post, and Content Maven tests
 - Publish JUnit test reports
-- Package all four Spring Boot applications
-- Build backend, Identity Service, Post Service, and gateway Docker images
+- Package all five Spring Boot applications, including the retained rollback application
+- Build the four active service images plus the retained rollback image
 - Archive all generated JAR artifacts
 
 Expected Jenkins tool names:
@@ -276,6 +298,8 @@ blog-post-service:latest
 blog-content-service:<jenkins-build-number>
 blog-content-service:latest
 ```
+
+`blog-app-apis` is retained and validated as a temporary rollback artifact. It is not started by the active Phase 5 Docker Compose topology.
 
 Create a Jenkins Pipeline job and point it to this GitHub repository. Jenkins will read the `Jenkinsfile` from the repository root.
 
@@ -380,7 +404,7 @@ Security-related improvements already applied:
 
 ## Deployment Roadmap
 
-The planned deployment path is incremental and cost-aware:
+The remaining deployment path is incremental and cost-aware. It is outside the current local-completion scope:
 
 1. Deploy the gateway, Identity Service, Post Service, and Content Service as the stable AWS baseline.
 2. Store runtime configuration as environment variables.
