@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration and local full-stack integration are complete. AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, local full-stack integration, Jenkins CI, and local Kubernetes deployment are complete. AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -38,7 +38,7 @@ High-level structure:
 - Repositories handle persistence through Spring Data JPA
 - Spring Security protects write/admin operations with JWT-based authentication
 - MySQL is used for local/prod-style runtime, while tests use an isolated H2 profile
-- Docker Compose runs the gateway, three private business services, and three MySQL databases
+- Docker Compose and Kubernetes run the gateway, three private business services, and three MySQL databases
 
 ## Engineering Improvements
 
@@ -66,11 +66,13 @@ Completed improvements:
 - Completed Phase 5 Content Service extraction, final database ownership, explicit gateway routing, and backend retirement
 - Added a safe initial `General` category for an empty Content database so a fresh local environment supports post creation
 - Verified the React registration, login, profile, post, category, and comment flows through the gateway
+- Added a dedicated Minikube deployment with persistent MySQL and image storage, generated runtime secrets, health probes, resource limits, and an end-to-end smoke test
 
 ## Documentation Map
 
 - [Architecture reference](docs/architecture.md) — topology, route/data ownership, security, reliability, and migration sequence
 - [Local end-to-end runbook](docs/local-end-to-end.md) — Docker, React, browser journey, checks, and troubleshooting
+- [Local Kubernetes runbook](deploy/k8s/README.md) — dedicated Minikube profile, deployment, smoke test, and diagnostics
 - [Interview and resume guide](docs/interview-and-resume-guide.md) — project pitch, factual resume bullets, design answers, and demo order
 - [Phase 3 Identity extraction](docs/phase-3-identity-service.md)
 - [Phase 4 Post extraction](docs/phase-4-post-service.md)
@@ -183,6 +185,7 @@ See [Phase 5 Content Service](docs/phase-5-content-service.md) for migration, cu
 - Spring Boot Actuator
 - Flyway
 - Docker and Docker Compose
+- Kubernetes, Kustomize, and Minikube
 - Jenkins
 - JUnit 5, Mockito, MockMvc, Spring Security Test
 
@@ -231,6 +234,29 @@ Remove local database and uploaded image volumes:
 docker compose down -v
 ```
 
+## Run Locally With Kubernetes
+
+Create the dedicated cluster once:
+
+```powershell
+minikube start -p blog-platform --driver=docker --memory=6144 --cpus=4
+```
+
+Build, load, and deploy all application images:
+
+```powershell
+.\deploy\k8s\scripts\deploy-local.ps1 -Profile blog-platform
+```
+
+On Windows with the Docker driver, expose the frontend locally and run the end-to-end verification:
+
+```powershell
+kubectl -n blog-platform port-forward service/frontend 18080:80
+.\deploy\k8s\scripts\smoke-test.ps1 -BaseUrl http://localhost:18080 -Profile blog-platform
+```
+
+See the [local Kubernetes runbook](deploy/k8s/README.md) for resource requirements, diagnostics, and cleanup.
+
 ## Run Tests
 
 ```bash
@@ -275,14 +301,10 @@ Pipeline stages:
 - Publish JUnit test reports
 - Package all five Spring Boot applications, including the retained rollback application
 - Build the four active service images plus the retained rollback image
+- Validate Docker Compose and Kubernetes deployment configuration
 - Archive all generated JAR artifacts
 
-Expected Jenkins tool names:
-
-- JDK: `jdk17`
-- Maven: `maven3`
-
-The Jenkins agent must also have Docker installed and permission to run Docker commands.
+The Jenkins agent must have Java 17, Maven, Docker, and kubectl on its system `PATH`, with permission to run Docker commands.
 
 Docker images are tagged as:
 
@@ -353,7 +375,7 @@ These endpoints report gateway health and are used for local Docker checks, CI/C
 
 ## Production Readiness
 
-The platform is ready for a gateway-fronted portfolio deployment using Docker Compose.
+The platform is ready for gateway-fronted portfolio demonstrations using Docker Compose or local Kubernetes.
 
 Important deployment behavior:
 
@@ -438,6 +460,6 @@ Implemented migration strategy:
 4. Added token-protected service-to-service communication only for reference validation.
 5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
 
-Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, centralized observability, and Kubernetes only when operational scale justifies it.
+Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, centralized observability, and managed-cloud Kubernetes only when operational scale justifies it.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.

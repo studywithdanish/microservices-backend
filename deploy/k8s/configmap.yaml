@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blog-config
+data:
+  SPRING_PROFILES_ACTIVE: prod
+  IDENTITY_MYSQL_DATABASE: blog_identity
+  IDENTITY_DB_USERNAME: identity_user
+  POST_MYSQL_DATABASE: blog_posts
+  POST_DB_USERNAME: post_user
+  CONTENT_MYSQL_DATABASE: blog_content
+  CONTENT_DB_USERNAME: content_user
+  JWT_EXPIRATION_MS: "18000000"
+  CONTENT_HTTP_CONNECT_TIMEOUT: 2s
+  CONTENT_HTTP_READ_TIMEOUT: 5s
+  CORS_ALLOWED_ORIGINS: http://localhost:30080,http://127.0.0.1:30080,http://192.168.49.2:30080
