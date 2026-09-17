@@ -78,10 +78,16 @@ kubectl -n blog-platform logs deployment/content-service
 ## Validate manifests without deploying
 
 ```powershell
-kubectl apply --dry-run=client --validate=false -k deploy/k8s
+kubectl kustomize deploy/k8s
 ```
 
-The backend Jenkins pipeline runs this validation along with `docker compose config --quiet`.
+This renders and validates the Kustomize structure without requiring a live cluster or kubeconfig. The backend Jenkins pipeline runs this check along with `docker compose config --quiet`.
+
+When a cluster is available, add a client-side apply check:
+
+```powershell
+kubectl apply --dry-run=client --validate=false -k deploy/k8s
+```
 
 ## Stop or remove the environment
 
@@ -96,4 +102,3 @@ Deleting the profile permanently removes its local Kubernetes workloads and data
 ```powershell
 minikube delete -p blog-platform
 ```
-

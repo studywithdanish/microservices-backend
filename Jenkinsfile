@@ -102,7 +102,7 @@ pipeline {
             steps {
                 script {
                     runCommand('docker compose config --quiet')
-                    runCommand('kubectl apply --dry-run=client --validate=false -k deploy/k8s')
+                    runCommand('kubectl kustomize deploy/k8s')
                 }
             }
         }
