@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    tools {
-        jdk 'jdk17'
-        maven 'maven3'
-    }
-
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -99,6 +94,15 @@ pipeline {
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'content-service/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Validate Deployment Configuration') {
+            steps {
+                script {
+                    runCommand('docker compose config --quiet')
+                    runCommand('kubectl kustomize deploy/k8s')
                 }
             }
         }
