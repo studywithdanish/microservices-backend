@@ -12,11 +12,15 @@ flowchart LR
         Gateway -->|Auth and user routes| Identity[Identity Service<br/>Port 9092]
         Gateway -->|Post and image routes| Post[Post Service<br/>Port 9093]
         Gateway -->|Category and comment routes| Content[Content Service<br/>Port 9094]
+        Gateway -->|Notification routes| Notification[Notification Service<br/>Port 9095]
 
         Identity --> IdentityDb[(Identity MySQL)]
         Post --> PostDb[(Post MySQL)]
         Post --> Images[(Image volume)]
         Content --> ContentDb[(Content MySQL)]
+        Notification --> NotificationDb[(Notification MySQL)]
+        Post -->|PostPublished outbox event| Kafka[(Apache Kafka)]
+        Kafka -->|consumer group| Notification
 
         Post -.->|Category reference lookup<br/>internal service token| Content
         Content -.->|Post reference validation<br/>internal service token| Post
@@ -32,6 +36,7 @@ Only the gateway publishes a backend host port. Business services and their data
 | `/api/v1/auth/**`, `/api/users/**` | Identity Service | Registration, login, profiles, roles, JWT issuance |
 | `/api/posts`, `/api/post/**`, search/user/category post routes | Post Service | Posts, category snapshots, post images, ownership rules |
 | `/api/categories/**`, `/api/posts/{id}/comments`, `/api/comments/**` | Content Service | Categories, comments, comment ownership rules |
+| `/api/notifications/**` | Notification Service | Authenticated user's asynchronous notifications |
 | `/actuator/health`, `/actuator/info` | API Gateway | Public operational status |
 
 There is no public catch-all route. Unknown APIs and `/internal/**` are not forwarded.
@@ -43,6 +48,7 @@ There is no public catch-all route. Unknown APIs and `/internal/**` are not forw
 | Identity | Users, BCrypt hashes, roles, user-role mappings | Post and comment rows |
 | Post | Posts, category snapshots, image names/files | Identity and Content tables |
 | Content | Categories and comments | Identity and Post tables |
+| Notification | User notifications and processed event IDs | Identity, Post, and Content tables |
 
 Cross-boundary relationships use scalar identifiers such as `authorId`, `postId`, and `categoryId`. A post stores a category snapshot so reads do not create an N+1 HTTP call pattern.
 
@@ -85,6 +91,8 @@ sequenceDiagram
 - Comment creation fails safely when Post reference validation is unavailable.
 - Every service and database has an independent health check.
 - Flyway owns schema creation; production uses Hibernate validation rather than automatic mutation.
+- Post creation atomically records an outbox event, so Kafka downtime does not lose publication intent.
+- Notification consumption is idempotent, and retry exhaustion routes malformed or repeatedly failing events to a DLT.
 
 ## Migration Strategy
 
@@ -95,5 +103,6 @@ The migration used the strangler pattern:
 3. Extract Identity and give it an independent database.
 4. Extract Posts and images, replacing shared relationships with explicit contracts.
 5. Extract Categories and Comments, remove the gateway catch-all, and retire the monolith from the active runtime.
+6. Introduce Kafka behind a transactional outbox and add Notification Service as an asynchronous consumer.
 
 Legacy source remains temporarily as a rollback asset, but it is not part of the active Docker topology.

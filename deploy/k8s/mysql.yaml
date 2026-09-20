@@ -83,6 +83,88 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: notification-mysql
+spec:
+  clusterIP: None
+  selector:
+    app: notification-mysql
+  ports:
+    - name: mysql
+      port: 3306
+      targetPort: mysql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: notification-mysql
+spec:
+  serviceName: notification-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-mysql
+  template:
+    metadata:
+      labels:
+        app: notification-mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mysql
+              containerPort: 3306
+          env:
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: NOTIFICATION_MYSQL_DATABASE
+            - name: MYSQL_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: NOTIFICATION_DB_USERNAME
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: blog-secrets
+                  key: NOTIFICATION_DB_PASSWORD
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: blog-secrets
+                  key: NOTIFICATION_MYSQL_ROOT_PASSWORD
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 768Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: post-mysql
 spec:
   clusterIP: None

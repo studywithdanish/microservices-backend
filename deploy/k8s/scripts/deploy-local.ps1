@@ -41,6 +41,7 @@ if ($LASTEXITCODE -ne 0) {
     $identityPassword = [guid]::NewGuid().ToString('N')
     $postPassword = [guid]::NewGuid().ToString('N')
     $contentPassword = [guid]::NewGuid().ToString('N')
+    $notificationPassword = [guid]::NewGuid().ToString('N')
 
     Invoke-Checked kubectl @(
         '-n', $namespace, 'create', 'secret', 'generic', 'blog-secrets',
@@ -51,19 +52,35 @@ if ($LASTEXITCODE -ne 0) {
         "--from-literal=POST_DB_PASSWORD=$postPassword",
         "--from-literal=POST_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))",
         "--from-literal=CONTENT_DB_PASSWORD=$contentPassword",
-        "--from-literal=CONTENT_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))"
+        "--from-literal=CONTENT_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))",
+        "--from-literal=NOTIFICATION_DB_PASSWORD=$notificationPassword",
+        "--from-literal=NOTIFICATION_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))"
     )
 } else {
     Write-Host 'Reusing the existing blog-secrets Secret.'
+    $notificationSecret = (& kubectl -n $namespace get secret blog-secrets -o 'jsonpath={.data.NOTIFICATION_DB_PASSWORD}').Trim()
+    if (-not $notificationSecret) {
+        $secretPatch = @{
+            stringData = @{
+                NOTIFICATION_DB_PASSWORD = [guid]::NewGuid().ToString('N')
+                NOTIFICATION_MYSQL_ROOT_PASSWORD = [guid]::NewGuid().ToString('N')
+            }
+        } | ConvertTo-Json -Compress
+        Invoke-Checked kubectl @(
+            '-n', $namespace, 'patch', 'secret', 'blog-secrets',
+            '--type=merge', '-p', $secretPatch
+        )
+    }
 }
 
 Invoke-Checked kubectl @(
     '-n', $namespace, 'apply',
     '-f', (Join-Path $k8sRoot 'configmap.yaml'),
-    '-f', (Join-Path $k8sRoot 'mysql.yaml')
+    '-f', (Join-Path $k8sRoot 'mysql.yaml'),
+    '-f', (Join-Path $k8sRoot 'kafka.yaml')
 )
 
-foreach ($database in @('identity-mysql', 'post-mysql', 'content-mysql')) {
+foreach ($database in @('identity-mysql', 'post-mysql', 'content-mysql', 'notification-mysql', 'kafka')) {
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "statefulset/$database", '--timeout=300s')
 }
 
@@ -73,7 +90,7 @@ Invoke-Checked kubectl @(
     '-f', (Join-Path $k8sRoot 'frontend.yaml')
 )
 
-foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'api-gateway', 'frontend')) {
+foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend')) {
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "deployment/$deployment", '--timeout=300s')
 }
 

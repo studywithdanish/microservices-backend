@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, local full-stack integration, Jenkins CI, and local Kubernetes deployment are complete. AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, and local Kubernetes deployment are complete. AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -16,10 +16,14 @@ flowchart LR
     Gateway --> Identity[Identity Service :9092]
     Gateway --> Post[Post Service :9093]
     Gateway --> Content[Content Service :9094]
+    Gateway --> Notification[Notification Service :9095]
     Identity --> IdentityDb[(Identity MySQL)]
     Post --> PostDb[(Post MySQL)]
     Post --> Images[(Image volume)]
     Content --> ContentDb[(Content MySQL)]
+    Post -->|Transactional outbox| Kafka[(Apache Kafka)]
+    Kafka -->|PostPublished v1| Notification
+    Notification --> NotificationDb[(Notification MySQL)]
     Post -. category validation .-> Content
     Content -. post validation .-> Post
 ```
@@ -30,6 +34,10 @@ High-level structure:
 - The Identity Service owns users, credentials, roles, registration, login, and JWT issuance
 - The Post Service owns posts, category snapshots, images, and post authorization
 - The Content Service owns categories and comments
+- The Notification Service consumes versioned Kafka events and owns user notifications
+- Post creation records a `PostPublished` event in a transactional outbox before asynchronous publication
+- Kafka delivery is at-least-once; event IDs make notification consumption idempotent
+- Failed consumer records are retried and then moved to `blog.posts.published.v1.DLT`
 - Services validate identity claims locally and do not query identity data
 - Every business service has its own Flyway-managed MySQL database
 - All downstream services are private inside Docker and enforce their own authorization
@@ -38,7 +46,7 @@ High-level structure:
 - Repositories handle persistence through Spring Data JPA
 - Spring Security protects write/admin operations with JWT-based authentication
 - MySQL is used for local/prod-style runtime, while tests use an isolated H2 profile
-- Docker Compose and Kubernetes run the gateway, three private business services, and three MySQL databases
+- Docker Compose and Kubernetes run the gateway, four private business services, Kafka, and four MySQL databases
 
 ## Engineering Improvements
 
@@ -67,6 +75,7 @@ Completed improvements:
 - Added a safe initial `General` category for an empty Content database so a fresh local environment supports post creation
 - Verified the React registration, login, profile, post, category, and comment flows through the gateway
 - Added a dedicated Minikube deployment with persistent MySQL and image storage, generated runtime secrets, health probes, resource limits, and an end-to-end smoke test
+- Added Apache Kafka in KRaft mode, a durable Post Service outbox, a versioned `PostPublished` event, an idempotent Notification Service consumer, retry/DLT handling, and asynchronous smoke-test coverage
 
 ## Documentation Map
 
@@ -77,6 +86,7 @@ Completed improvements:
 - [Phase 3 Identity extraction](docs/phase-3-identity-service.md)
 - [Phase 4 Post extraction](docs/phase-4-post-service.md)
 - [Phase 5 Content extraction](docs/phase-5-content-service.md)
+- [Phase 6 Kafka events](docs/phase-6-kafka-events.md) — outbox, event contract, delivery guarantees, consumer idempotency, and operations
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -171,6 +181,18 @@ Categories and Comments now run as the final standalone business service:
 
 See [Phase 5 Content Service](docs/phase-5-content-service.md) for migration, cutover, verification, rollback, and interview guidance.
 
+## Phase 6: Kafka Event-Driven Notifications
+
+Post creation now demonstrates a reliable asynchronous workflow rather than a direct dual write:
+
+1. Post Service commits the post and a `PostPublished` outbox row in one MySQL transaction.
+2. A scheduled relay publishes the versioned JSON event to `blog.posts.published.v1` with the post ID as its Kafka key.
+3. Notification Service consumes the event as consumer group `notification-service-v1` and creates a durable notification for the author.
+4. The event ID has a unique database constraint, making redelivery safe.
+5. Consumer failures are retried twice and then published to `blog.posts.published.v1.DLT`.
+
+The API Gateway exposes authenticated reads at `GET /api/notifications` and ownership-safe updates at `PUT /api/notifications/{id}/read`. See [Phase 6 Kafka Events](docs/phase-6-kafka-events.md).
+
 ## Tech Stack
 
 - Java 17
@@ -187,6 +209,8 @@ See [Phase 5 Content Service](docs/phase-5-content-service.md) for migration, cu
 - Docker and Docker Compose
 - Kubernetes, Kustomize, and Minikube
 - Jenkins
+- Apache Kafka 3.9 in KRaft mode
+- Spring for Apache Kafka
 - JUnit 5, Mockito, MockMvc, Spring Security Test
 
 ## Run Locally With Docker
@@ -197,7 +221,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start all three databases, all three business services, and the gateway:
+Start all four databases, all four business services, Kafka, and the gateway:
 
 ```bash
 docker compose up --build
@@ -289,6 +313,12 @@ Run the gateway tests independently:
 mvn -f gateway-service/pom.xml clean test
 ```
 
+Run the Notification Service tests independently:
+
+```bash
+mvn -f notification-service/pom.xml clean test
+```
+
 ## Jenkins Pipeline
 
 This repository includes a `Jenkinsfile` for a basic CI pipeline.
@@ -297,10 +327,10 @@ Pipeline stages:
 
 - Checkout source code
 - Verify Java and Maven versions
-- Run legacy rollback backend plus Gateway, Identity, Post, and Content Maven tests
+- Run legacy rollback backend plus Gateway, Identity, Post, Content, and Notification Maven tests
 - Publish JUnit test reports
 - Package all five Spring Boot applications, including the retained rollback application
-- Build the four active service images plus the retained rollback image
+- Build the five active service images plus the retained rollback image
 - Validate Docker Compose and Kubernetes deployment configuration
 - Archive all generated JAR artifacts
 
@@ -319,6 +349,8 @@ blog-post-service:<jenkins-build-number>
 blog-post-service:latest
 blog-content-service:<jenkins-build-number>
 blog-content-service:latest
+blog-notification-service:<jenkins-build-number>
+blog-notification-service:latest
 ```
 
 `blog-app-apis` is retained and validated as a temporary rollback artifact. It is not started by the active Phase 5 Docker Compose topology.
@@ -343,6 +375,13 @@ Important variables:
 - `CONTENT_DB_URL`
 - `CONTENT_DB_USERNAME`
 - `CONTENT_DB_PASSWORD`
+- `NOTIFICATION_DB_URL`
+- `NOTIFICATION_DB_USERNAME`
+- `NOTIFICATION_DB_PASSWORD`
+- `KAFKA_BOOTSTRAP_SERVERS`
+- `KAFKA_NOTIFICATION_GROUP_ID`
+- `POST_PUBLISHED_TOPIC`
+- `POST_PUBLISHED_DLT_TOPIC`
 - `JWT_SECRET`
 - `INTERNAL_SERVICE_TOKEN`
 - `JWT_EXPIRATION_MS`
@@ -428,7 +467,7 @@ Security-related improvements already applied:
 
 The remaining deployment path is incremental and cost-aware. It is outside the current local-completion scope:
 
-1. Deploy the gateway, Identity Service, Post Service, and Content Service as the stable AWS baseline.
+1. Deploy the gateway, Identity, Post, Content, Notification, and Kafka topology as the stable AWS baseline.
 2. Store runtime configuration as environment variables.
 3. Add a Docker image registry push stage in Jenkins.
 4. Add Terraform for repeatable infrastructure.
@@ -451,6 +490,7 @@ Implemented service boundaries:
 - Identity/Auth/User service (completed in Phase 3)
 - Post service (completed in Phase 4)
 - Category/Comment service (completed in Phase 5)
+- Notification service and Kafka event workflow (completed in Phase 6)
 
 Implemented migration strategy:
 
@@ -459,6 +499,7 @@ Implemented migration strategy:
 3. Extracted Posts and then Categories/Comments behind unchanged gateway URLs.
 4. Added token-protected service-to-service communication only for reference validation.
 5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
+6. Added reliable asynchronous publication with a transactional outbox and idempotent Kafka consumer.
 
 Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, centralized observability, and managed-cloud Kubernetes only when operational scale justifies it.
 

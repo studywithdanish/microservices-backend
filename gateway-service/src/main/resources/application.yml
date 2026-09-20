@@ -33,6 +33,13 @@ spring:
                 - Path=/api/categories,/api/categories/**,/api/posts/*/comments,/api/comments/**
               filters:
                 - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
+            - id: notification-service
+              order: -3
+              uri: ${NOTIFICATION_SERVICE_BASE_URL:http://localhost:9095}
+              predicates:
+                - Path=/api/notifications,/api/notifications/**
+              filters:
+                - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
           httpclient:
             connect-timeout: 3000
             response-timeout: 30s
@@ -55,4 +62,4 @@ info:
   app:
     name: Blogging Platform API Gateway
     description: Public routing boundary for independently owned blogging services
-    version: 5.0.0
+    version: 6.0.0

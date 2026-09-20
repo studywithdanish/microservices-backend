@@ -82,6 +82,21 @@ $postRequest = @{
 }
 $post = Invoke-RestMethod @postRequest
 
+$notification = $null
+$notificationDeadline = (Get-Date).AddSeconds(60)
+do {
+    $notifications = @(Invoke-RestMethod -Uri "$BaseUrl/api/notifications" -Headers $authorization)
+    $notification = $notifications | Where-Object { $_.postId -eq $post.postId } | Select-Object -First 1
+    if ($notification) {
+        break
+    }
+    Start-Sleep -Seconds 2
+} while ((Get-Date) -lt $notificationDeadline)
+
+if (-not $notification) {
+    throw "Kafka notification for post '$($post.postId)' was not available within 60 seconds."
+}
+
 $commentRequest = @{
     Method = 'Post'
     Uri = "$BaseUrl/api/posts/$($post.postId)/comments"
@@ -97,5 +112,6 @@ $comment = Invoke-RestMethod @commentRequest
     ProfileEmail = $currentUser.email
     CategoryCount = $categories.Count
     CreatedPostId = $post.postId
+    KafkaNotificationId = $notification.id
     CreatedCommentId = $comment.id
 } | Format-List

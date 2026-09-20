@@ -2,7 +2,7 @@
 
 ## 30-second project introduction
 
-“I migrated a Spring Boot blogging monolith to gateway-fronted microservices using the strangler pattern. I first removed unsafe cross-domain persistence relationships and established ownership rules, then introduced Spring Cloud Gateway and extracted Identity, Posts, and Content into independently deployed services with separate MySQL databases. Existing frontend URLs stayed stable. JWT claims support local authorization, private token-protected APIs validate cross-service references, and Docker Compose, Flyway, health checks, Jenkins, and automated tests make the system operable.”
+“I migrated a Spring Boot blogging monolith to gateway-fronted microservices using the strangler pattern. I introduced independently owned Identity, Post, Content, and Notification services, then added Kafka through a `PostPublished` workflow. Post Service uses a transactional outbox, and Notification Service consumes events idempotently with retry and dead-letter handling. JWT authorization, database-per-service ownership, Docker, Kubernetes, Jenkins, Flyway, and automated tests make the system operable.”
 
 ## 90-second explanation
 
@@ -16,21 +16,23 @@
 
 Use two or three of these, depending on available space:
 
-- Migrated a Spring Boot blogging monolith to API Gateway, Identity, Post, and Content services using the strangler pattern while preserving existing frontend API contracts.
-- Established database-per-service ownership across three MySQL schemas; replaced cross-database JPA relationships with scalar identifiers, category snapshots, and explicit token-protected service contracts.
+- Migrated a Spring Boot blogging monolith to API Gateway, Identity, Post, Content, and Notification services using the strangler pattern while preserving existing frontend API contracts.
+- Established database-per-service ownership across four MySQL schemas; replaced cross-database JPA relationships with scalar identifiers, category snapshots, explicit service contracts, and asynchronous events.
 - Implemented Spring Security 6, BCrypt, JWT claim-based owner/admin authorization, gateway CORS, correlation IDs, timeouts, and consistent downstream failure responses.
-- Containerized the gateway, three services, and three databases with Docker Compose; added Flyway migrations, Actuator health checks, Jenkins build stages, and automated backend/frontend tests.
+- Containerized the gateway, four business services, Kafka, and four databases with Docker Compose; added Flyway migrations, Actuator health checks, Jenkins build stages, and automated backend/frontend tests.
+- Implemented an Apache Kafka `PostPublished` workflow using a transactional outbox, versioned events, idempotent consumption, retry handling, and a dead-letter topic.
+- Added a JWT-protected Notification Service with its own MySQL database and integrated it across the gateway, Docker, Kubernetes, Jenkins, and end-to-end smoke tests.
 - Integrated a React client through the gateway for registration, login, profile retrieval, post creation, and comments, proving the end-to-end service flow locally.
 
 Do not claim AWS deployment until it has actually been completed and verified.
 
 ## Suggested project heading
 
-**Microservices Blogging Platform — Java 17, Spring Boot 3, Spring Cloud Gateway, Spring Security, JWT, MySQL, Flyway, Docker, Jenkins, React**
+**Microservices Blogging Platform — Java 17, Spring Boot 3, Kafka, Spring Cloud Gateway, Spring Security, JWT, MySQL, Flyway, Docker, Kubernetes, Jenkins, React**
 
 GitHub description:
 
-> Incremental monolith-to-microservices migration using Spring Cloud Gateway, database-per-service ownership, JWT authorization, Docker Compose, Flyway, Jenkins, React, and automated tests.
+> Incremental monolith-to-microservices migration with Kafka, transactional outbox, idempotent consumers, Spring Cloud Gateway, database-per-service ownership, JWT, Docker, Kubernetes, Jenkins, and automated tests.
 
 ## Design questions and strong answers
 
@@ -76,7 +78,15 @@ Use asymmetric JWT signing and JWKS, a secrets manager, centralized logs/traces/
 
 ### Where are distributed transactions?
 
-There is no cross-database ACID transaction. Each service commits only its data. Synchronous reference checks protect immediate invariants; workflows that span durable state changes would use events, idempotent consumers, and a saga/outbox pattern.
+There is no cross-database ACID transaction. Each service commits only its data. For post publication, Post Service commits the post and outbox row locally, then Kafka delivers the event at least once. Notification Service uses the stable event ID as an idempotency key. Larger multi-step workflows would extend this with saga compensation.
+
+### Why Kafka and not another REST call?
+
+The post response should not depend on notification availability, and future consumers such as search or analytics should not increase Post Service coupling. Kafka provides durable fan-out and replay. The outbox closes the database/message dual-write gap, while consumer idempotency handles redelivery.
+
+### Is the Kafka workflow exactly once?
+
+No. It intentionally uses at-least-once delivery. A crash after sending but before marking an outbox row can cause a duplicate. The event ID is uniquely stored by Notification Service, so duplicate delivery does not create duplicate business state.
 
 ### What proves this is more than multiple folders?
 
@@ -87,11 +97,12 @@ Each active service has a separate application, image, database/schema, Flyway h
 1. Show the architecture diagram and explain gateway-only public access.
 2. Run `docker compose ps` and gateway health.
 3. Register and log in through the React client.
-4. Show the dashboard combining data from all three business services.
-5. Create a post and comment to demonstrate both internal reference checks.
-6. Show the separate Flyway migrations and databases.
-7. Show automated tests and Jenkins stages.
-8. Close with tradeoffs and the deliberately deferred AWS/observability roadmap.
+4. Create a post and show the corresponding notification arriving asynchronously through Kafka.
+5. Create a comment to demonstrate synchronous reference validation.
+6. Show the outbox, topic, idempotency constraint, and DLT configuration.
+7. Show the separate Flyway migrations and databases.
+8. Show automated tests and Jenkins stages.
+9. Close with tradeoffs and the deliberately deferred AWS/observability roadmap.
 
 ## Be ready to explain personally
 
