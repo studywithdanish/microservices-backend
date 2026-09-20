@@ -95,7 +95,7 @@ docker compose config
 docker compose up --build
 ```
 
-The completed implementation currently passes 88 automated tests across the retained rollback backend, Identity Service, Post Service, Content Service, and API Gateway.
+At the Phase 5 checkpoint, the implementation passed 88 automated tests across the retained rollback backend, Identity Service, Post Service, Content Service, and API Gateway. Phase 6 adds a separate Notification Service test suite.
 
 Through `http://localhost:9090`, verify:
 

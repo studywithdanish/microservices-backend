@@ -38,10 +38,16 @@ public class PostService {
 
     private final PostRepository postRepository;
     private final CategoryClient categoryClient;
+    private final PostEventOutbox postEventOutbox;
 
-    public PostService(PostRepository postRepository, CategoryClient categoryClient) {
+    public PostService(
+            PostRepository postRepository,
+            CategoryClient categoryClient,
+            PostEventOutbox postEventOutbox
+    ) {
         this.postRepository = postRepository;
         this.categoryClient = categoryClient;
+        this.postEventOutbox = postEventOutbox;
     }
 
     public PostDto create(PostCreateRequest request, Integer authorId) {
@@ -59,7 +65,9 @@ public class PostService {
         post.setCategoryDescription(category.categoryDescription());
         post.setImageName("default.png");
         post.setAddedDate(new Date());
-        return toDto(postRepository.save(post));
+        Post saved = postRepository.save(post);
+        postEventOutbox.recordPostPublished(saved);
+        return toDto(saved);
     }
 
     public PostDto update(PostUpdateRequest request, Integer postId, JwtPrincipal actor) {

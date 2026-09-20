@@ -26,6 +26,7 @@ class ApiGatewayRoutingTest {
     private static HttpServer identityService;
     private static HttpServer postService;
     private static HttpServer contentService;
+    private static HttpServer notificationService;
 
     @Autowired
     private WebTestClient webTestClient;
@@ -49,6 +50,9 @@ class ApiGatewayRoutingTest {
         if (contentService != null) {
             contentService.stop(0);
         }
+        if (notificationService != null) {
+            notificationService.stop(0);
+        }
     }
 
     @DynamicPropertySource
@@ -65,6 +69,10 @@ class ApiGatewayRoutingTest {
         registry.add(
                 "CONTENT_SERVICE_BASE_URL",
                 () -> "http://localhost:" + contentService.getAddress().getPort()
+        );
+        registry.add(
+                "NOTIFICATION_SERVICE_BASE_URL",
+                () -> "http://localhost:" + notificationService.getAddress().getPort()
         );
         registry.add(
                 "CORS_ALLOWED_ORIGINS",
@@ -137,6 +145,18 @@ class ApiGatewayRoutingTest {
     }
 
     @Test
+    void routesAuthenticatedNotificationApisToNotificationService() {
+        webTestClient.get()
+                .uri("/api/notifications")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer identity-token")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("notification|GET|/api/notifications|Bearer identity-token|"));
+    }
+
+    @Test
     void generatesCorrelationIdWhenClientDoesNotProvideOne() {
         webTestClient.get()
                 .uri("/api/posts")
@@ -195,6 +215,9 @@ class ApiGatewayRoutingTest {
             contentService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
             contentService.createContext("/", exchange -> echoRequest(exchange, "content"));
             contentService.start();
+            notificationService = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+            notificationService.createContext("/", exchange -> echoRequest(exchange, "notification"));
+            notificationService.start();
         } catch (IOException exception) {
             throw new IllegalStateException("Failed to start test backend", exception);
         }

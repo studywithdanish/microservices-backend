@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, frontend, three MySQL databases, and Caddy reverse proxy on one low-cost AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -19,6 +19,8 @@ Caddy manages HTTPS certificates automatically. API traffic passes through the g
 /api/posts/*/comments  -> API Gateway -> Content Service -> Content MySQL
 /api/comments/**       -> API Gateway -> Content Service -> Content MySQL
 /api/categories/**     -> API Gateway -> Content Service -> Content MySQL
+/api/notifications/**  -> API Gateway -> Notification Service -> Notification MySQL
+PostPublished          -> Post Service -> Kafka -> Notification Service
 /actuator/**         -> API Gateway health endpoints
 ```
 
@@ -106,6 +108,8 @@ POST_MYSQL_ROOT_PASSWORD
 POST_DB_PASSWORD
 CONTENT_MYSQL_ROOT_PASSWORD
 CONTENT_DB_PASSWORD
+NOTIFICATION_MYSQL_ROOT_PASSWORD
+NOTIFICATION_DB_PASSWORD
 JWT_SECRET
 INTERNAL_SERVICE_TOKEN
 ```
@@ -137,6 +141,8 @@ Check logs:
 docker compose -f docker-compose.prod.yml --env-file .env logs -f identity-service
 docker compose -f docker-compose.prod.yml --env-file .env logs -f post-service
 docker compose -f docker-compose.prod.yml --env-file .env logs -f content-service
+docker compose -f docker-compose.prod.yml --env-file .env logs -f notification-service
+docker compose -f docker-compose.prod.yml --env-file .env logs -f kafka
 docker compose -f docker-compose.prod.yml --env-file .env logs -f gateway
 docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
 ```
@@ -205,7 +211,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a cost-conscious Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing and correlation boundary. Identity, Posts, Categories, and Comments are independently owned across three business services and three databases. Content Service verifies post references through a private token-protected API instead of a shared table. Services validate JWT claims locally, remain private on the Docker network, use Flyway, and receive secrets through environment variables. The final gateway has explicit route ownership and no catch-all legacy backend. Database, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later infrastructure automation.
+I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 

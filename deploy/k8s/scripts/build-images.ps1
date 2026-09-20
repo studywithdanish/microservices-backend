@@ -24,6 +24,7 @@ $images = [ordered]@{
     'blog-identity-service:k8s' = (Join-Path $backendRoot 'identity-service')
     'blog-post-service:k8s' = (Join-Path $backendRoot 'post-service')
     'blog-content-service:k8s' = (Join-Path $backendRoot 'content-service')
+    'blog-notification-service:k8s' = (Join-Path $backendRoot 'notification-service')
 }
 
 foreach ($entry in $images.GetEnumerator()) {

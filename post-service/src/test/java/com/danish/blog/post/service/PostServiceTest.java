@@ -36,12 +36,15 @@ class PostServiceTest {
     @Mock
     private CategoryClient categoryClient;
 
+    @Mock
+    private PostEventOutbox postEventOutbox;
+
     private PostService postService;
     private Post post;
 
     @BeforeEach
     void setUp() {
-        postService = new PostService(postRepository, categoryClient);
+        postService = new PostService(postRepository, categoryClient, postEventOutbox);
         post = post(10, 1);
     }
 
@@ -63,6 +66,7 @@ class PostServiceTest {
 
         ArgumentCaptor<Post> captor = ArgumentCaptor.forClass(Post.class);
         verify(postRepository).save(captor.capture());
+        verify(postEventOutbox).recordPostPublished(captor.getValue());
         assertThat(captor.getValue().getAuthorId()).isEqualTo(1);
         assertThat(captor.getValue().getCategoryTitle()).isEqualTo("Spring");
         assertThat(result.category().categoryId()).isEqualTo(3);

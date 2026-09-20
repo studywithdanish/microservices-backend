@@ -18,7 +18,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Wait until all seven containers report healthy or running. Verify the public entry point:
+Wait until the four databases, Kafka, four business services, and gateway report healthy or running. Verify the public entry point:
 
 ```powershell
 Invoke-RestMethod http://localhost:9090/actuator/health
@@ -63,6 +63,7 @@ mvn -f gateway-service/pom.xml clean test
 mvn -f identity-service/pom.xml clean test
 mvn -f post-service/pom.xml clean test
 mvn -f content-service/pom.xml clean test
+mvn -f notification-service/pom.xml clean test
 docker compose config
 ```
 
@@ -80,7 +81,7 @@ npm run security:audit
 docker compose down
 ```
 
-Use `docker compose down -v` only when you intentionally want to remove local databases and uploaded images.
+Use `docker compose down -v` only when you intentionally want to remove local databases, Kafka data, and uploaded images.
 
 ## Troubleshooting
 

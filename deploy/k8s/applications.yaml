@@ -179,6 +179,16 @@ spec:
                   key: CORS_ALLOWED_ORIGINS
             - name: POST_IMAGE_PATH
               value: /app/images/
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: POST_PUBLISHED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: POST_PUBLISHED_TOPIC
             - name: SERVER_FORWARD_HEADERS_STRATEGY
               value: framework
           startupProbe:
@@ -331,6 +341,119 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  name: notification-service
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - name: http
+      port: 9095
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: blog-notification-service:k8s
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9095
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: SPRING_PROFILES_ACTIVE
+            - name: NOTIFICATION_DB_URL
+              value: jdbc:mysql://notification-mysql:3306/blog_notifications?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+            - name: NOTIFICATION_DB_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: NOTIFICATION_DB_USERNAME
+            - name: NOTIFICATION_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: blog-secrets
+                  key: NOTIFICATION_DB_PASSWORD
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: KAFKA_NOTIFICATION_GROUP_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: KAFKA_NOTIFICATION_GROUP_ID
+            - name: POST_PUBLISHED_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: POST_PUBLISHED_TOPIC
+            - name: POST_PUBLISHED_DLT_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: POST_PUBLISHED_DLT_TOPIC
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: blog-secrets
+                  key: JWT_SECRET
+            - name: CORS_ALLOWED_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: CORS_ALLOWED_ORIGINS
+            - name: SERVER_FORWARD_HEADERS_STRATEGY
+              value: framework
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 18
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
   name: api-gateway
 spec:
   selector:
@@ -368,6 +491,8 @@ spec:
               value: http://post-service:9093
             - name: CONTENT_SERVICE_BASE_URL
               value: http://content-service:9094
+            - name: NOTIFICATION_SERVICE_BASE_URL
+              value: http://notification-service:9095
             - name: CORS_ALLOWED_ORIGINS
               valueFrom:
                 configMapKeyRef:

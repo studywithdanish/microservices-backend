@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - mysql.yaml
+  - kafka.yaml
   - applications.yaml
   - frontend.yaml
 labels:

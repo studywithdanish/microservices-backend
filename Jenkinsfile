@@ -14,6 +14,7 @@ pipeline {
         IDENTITY_IMAGE_NAME = 'blog-identity-service'
         POST_IMAGE_NAME = 'blog-post-service'
         CONTENT_IMAGE_NAME = 'blog-content-service'
+        NOTIFICATION_IMAGE_NAME = 'blog-notification-service'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -98,6 +99,19 @@ pipeline {
             }
         }
 
+        stage('Test Notification Service') {
+            steps {
+                script {
+                    runCommand('mvn -f notification-service/pom.xml clean test')
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'notification-service/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
         stage('Validate Deployment Configuration') {
             steps {
                 script {
@@ -115,6 +129,7 @@ pipeline {
                     runCommand('mvn -f identity-service/pom.xml package -DskipTests')
                     runCommand('mvn -f post-service/pom.xml package -DskipTests')
                     runCommand('mvn -f content-service/pom.xml package -DskipTests')
+                    runCommand('mvn -f notification-service/pom.xml package -DskipTests')
                 }
             }
         }
@@ -128,6 +143,7 @@ pipeline {
                     runCommand("docker build -t ${IDENTITY_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${IDENTITY_IMAGE_NAME}:latest identity-service")
                     runCommand("docker build -t ${POST_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${POST_IMAGE_NAME}:latest post-service")
                     runCommand("docker build -t ${CONTENT_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${CONTENT_IMAGE_NAME}:latest content-service")
+                    runCommand("docker build -t ${NOTIFICATION_IMAGE_NAME}:${DOCKER_IMAGE_TAG} -t ${NOTIFICATION_IMAGE_NAME}:latest notification-service")
                 }
             }
         }
@@ -135,7 +151,7 @@ pipeline {
 
     post {
         success {
-            archiveArtifacts artifacts: 'target/*.jar,gateway-service/target/*.jar,identity-service/target/*.jar,post-service/target/*.jar,content-service/target/*.jar', fingerprint: true
+            archiveArtifacts artifacts: 'target/*.jar,gateway-service/target/*.jar,identity-service/target/*.jar,post-service/target/*.jar,content-service/target/*.jar,notification-service/target/*.jar', fingerprint: true
         }
         cleanup {
             cleanWs(deleteDirs: true, disableDeferredWipeout: true)

@@ -34,11 +34,11 @@ From the backend repository root:
 
 The script performs these steps:
 
-1. Builds the four Spring Boot service images and the React/Nginx image.
+1. Builds the five active Spring Boot service images and the React/Nginx image.
 2. Loads all images into the selected Minikube profile.
 3. Generates a Kubernetes Secret only when one does not already exist.
-4. Deploys three MySQL StatefulSets with persistent volumes.
-5. Waits for the databases before deploying the services, gateway, and frontend.
+4. Deploys four MySQL StatefulSets and one Kafka StatefulSet with persistent volumes.
+5. Waits for the databases and Kafka before deploying the services, gateway, and frontend.
 6. Waits until every application Deployment is available.
 
 To reuse images that are already loaded:
@@ -73,6 +73,8 @@ kubectl -n blog-platform logs deployment/api-gateway
 kubectl -n blog-platform logs deployment/identity-service
 kubectl -n blog-platform logs deployment/post-service
 kubectl -n blog-platform logs deployment/content-service
+kubectl -n blog-platform logs deployment/notification-service
+kubectl -n blog-platform logs statefulset/kafka
 ```
 
 ## Validate manifests without deploying
