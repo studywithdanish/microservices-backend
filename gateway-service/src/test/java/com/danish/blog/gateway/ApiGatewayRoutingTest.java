@@ -157,6 +157,33 @@ class ApiGatewayRoutingTest {
     }
 
     @Test
+    void convertsTheHttpOnlyAuthenticationCookieToABearerHeader() {
+        webTestClient.get()
+                .uri("/api/notifications")
+                .cookie("BLOG_ACCESS_TOKEN", "cookie-token")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().doesNotExist("X-Received-Cookie")
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("notification|GET|/api/notifications|Bearer cookie-token|"));
+    }
+
+    @Test
+    void preservesAnExplicitBearerHeaderWhenACookieIsAlsoPresent() {
+        webTestClient.get()
+                .uri("/api/posts")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer explicit-token")
+                .cookie("BLOG_ACCESS_TOKEN", "cookie-token")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().doesNotExist("X-Received-Cookie")
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .startsWith("post|GET|/api/posts|Bearer explicit-token|"));
+    }
+
+    @Test
     void generatesCorrelationIdWhenClientDoesNotProvideOne() {
         webTestClient.get()
                 .uri("/api/posts")
@@ -237,6 +264,10 @@ class ApiGatewayRoutingTest {
         );
         byte[] response = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set(HttpHeaders.CONTENT_TYPE, "text/plain;charset=UTF-8");
+        String cookie = exchange.getRequestHeaders().getFirst(HttpHeaders.COOKIE);
+        if (cookie != null) {
+            exchange.getResponseHeaders().set("X-Received-Cookie", cookie);
+        }
         exchange.sendResponseHeaders(200, response.length);
         exchange.getResponseBody().write(response);
         exchange.close();

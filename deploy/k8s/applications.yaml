@@ -69,6 +69,21 @@ spec:
                 configMapKeyRef:
                   name: blog-config
                   key: JWT_EXPIRATION_MS
+            - name: AUTH_COOKIE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: AUTH_COOKIE_NAME
+            - name: AUTH_COOKIE_SECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: AUTH_COOKIE_SECURE
+            - name: AUTH_COOKIE_SAME_SITE
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: AUTH_COOKIE_SAME_SITE
             - name: CORS_ALLOWED_ORIGINS
               valueFrom:
                 configMapKeyRef:
@@ -493,6 +508,11 @@ spec:
               value: http://content-service:9094
             - name: NOTIFICATION_SERVICE_BASE_URL
               value: http://notification-service:9095
+            - name: AUTH_COOKIE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: AUTH_COOKIE_NAME
             - name: CORS_ALLOWED_ORIGINS
               valueFrom:
                 configMapKeyRef:

@@ -6,7 +6,7 @@ This runbook verifies the complete application locally without AWS.
 
 - Docker Desktop
 - Git
-- Node.js 20+ and npm 10+
+- Node.js 22.12+ and npm 10+
 - The backend and frontend repositories checked out beside each other
 
 ## 1. Start the backend
@@ -71,6 +71,8 @@ Frontend repository:
 
 ```powershell
 npm run test:ci
+npm run typecheck
+npm run test:e2e
 npm run build
 npm run security:audit
 ```
@@ -92,4 +94,4 @@ Use `docker compose down -v` only when you intentionally want to remove local da
 | Login returns 401 | Email/password are correct and the Identity Service is healthy |
 | No category is available | Content migration `V2__seed_initial_general_category.sql` ran, or the existing database has a category |
 | Post/comment returns 503 | Post and Content services can reach each other and share `INTERNAL_SERVICE_TOKEN` |
-| A previous JWT stops working after configuration changes | Log out and log in again to obtain a newly signed token |
+| A previous session stops working after configuration changes | Log out and log in again to obtain a newly signed secure cookie |

@@ -6,6 +6,7 @@ The Identity Service is the first business capability extracted from the origina
 - password hashing and credential verification
 - roles and administrator authorization
 - JWT issuance with immutable `userId` and `roles` claims
+- login/logout through an `HttpOnly`, `SameSite` cookie (`Secure` in production)
 - its own Flyway-managed `blog_identity` database
 
 The public URLs remain unchanged because the API Gateway routes `/api/v1/auth/**` and `/api/users/**` to this service.

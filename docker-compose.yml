@@ -121,6 +121,9 @@ services:
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_password}
       JWT_SECRET: ${JWT_SECRET:-change-this-dev-secret-before-production-change-this-dev-secret-before-production}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-18000000}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-BLOG_ACCESS_TOKEN}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      AUTH_COOKIE_SAME_SITE: ${AUTH_COOKIE_SAME_SITE:-Lax}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     expose:
       - "9092"
@@ -221,6 +224,7 @@ services:
       POST_SERVICE_BASE_URL: http://post-service:9093
       CONTENT_SERVICE_BASE_URL: http://content-service:9094
       NOTIFICATION_SERVICE_BASE_URL: http://notification-service:9095
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-BLOG_ACCESS_TOKEN}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "${GATEWAY_PORT:-9090}:9090"

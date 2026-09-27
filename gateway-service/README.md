@@ -8,13 +8,14 @@ The API Gateway is the public entry point for the blogging platform. Phase 5 com
 - Route post, search, user-post, category-post, and image paths to the Post Service
 - Route `/api/categories/**`, `/api/posts/{postId}/comments`, and `/api/comments/**` to the Content Service
 - Reject unknown and private routes instead of forwarding them to a catch-all backend
-- Preserve `Authorization` and other request headers
+- Translate the browser's authentication cookie into an internal bearer header and remove the raw cookie
+- Preserve explicit `Authorization` and other request headers for non-browser clients
 - Create or validate an `X-Correlation-Id` for every routed request
 - Apply browser CORS policy at the public boundary
 - Return a stable JSON response when a downstream service is unavailable or times out
 - Expose gateway health and info endpoints
 
-Authentication is enforced by the Identity Service, and resource authorization is enforced by the service that owns each resource. The gateway forwards bearer tokens but does not treat forwarded identity headers as trusted authentication.
+Authentication is enforced by the Identity Service, and resource authorization is enforced by the service that owns each resource. For browsers, the gateway converts the `HttpOnly` JWT cookie to the bearer contract used internally. Explicit bearer headers remain supported for API clients, but forwarded identity headers are never treated as trusted authentication.
 
 ## Run Outside Docker
 
@@ -41,6 +42,7 @@ Configuration variables:
 - `POST_SERVICE_BASE_URL`
 - `CONTENT_SERVICE_BASE_URL`
 - `CORS_ALLOWED_ORIGINS`
+- `AUTH_COOKIE_NAME`
 - `GATEWAY_TRUSTED_PROXIES`
 
 ## Tests
@@ -49,4 +51,4 @@ Configuration variables:
 mvn test
 ```
 
-The tests verify identity/post/content route separation, bearer-token forwarding, correlation IDs, gateway health, unavailable-service responses, timeout responses, and rejection of unconfigured routes.
+The tests verify identity/post/content route separation, secure cookie translation and removal, bearer-token forwarding, correlation IDs, gateway health, unavailable-service responses, timeout responses, and rejection of unconfigured routes.

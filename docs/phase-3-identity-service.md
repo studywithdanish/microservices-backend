@@ -74,26 +74,26 @@ docker compose config
 docker compose up --build
 ```
 
-Register and capture a token through the gateway:
+Register and establish a cookie-backed session through the gateway:
 
 ```bash
 curl -i -X POST http://localhost:9090/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"name":"Danish","email":"danish@example.com","password":"Password123!","about":"Platform engineer"}'
 
-curl -s -X POST http://localhost:9090/api/v1/auth/login \
+curl -i -c cookies.txt -X POST http://localhost:9090/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"danish@example.com","password":"Password123!"}'
 ```
 
-Use the returned token against both services through the same public gateway. The post example assumes category `1` already exists:
+Use the cookie jar against both services through the same public gateway. The gateway converts the browser cookie into the bearer token expected by each internal service. The post example assumes category `1` already exists:
 
 ```bash
 curl -i http://localhost:9090/api/v1/auth/me \
-  -H "Authorization: Bearer TOKEN"
+  -b cookies.txt
 
 curl -i -X POST http://localhost:9090/api/posts \
-  -H "Authorization: Bearer TOKEN" \
+  -b cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"title":"Phase 3","content":"Identity is now independent","categoryId":1}'
 ```
@@ -101,7 +101,7 @@ curl -i -X POST http://localhost:9090/api/posts \
 Expected behavior:
 
 - registration returns `201`
-- login returns `200` and a token
+- login returns `200` and an `HttpOnly`, `SameSite` authentication cookie
 - `/api/v1/auth/me` returns the current user
 - public content reads still work without a token
 - protected content writes accept the Identity Service token

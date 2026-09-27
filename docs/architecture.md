@@ -6,7 +6,7 @@ The React client knows one public backend address. Spring Cloud Gateway preserve
 
 ```mermaid
 flowchart LR
-    Browser[React frontend<br/>Port 3000] -->|HTTP and JWT| Gateway[Spring Cloud Gateway<br/>Port 9090]
+    Browser[React frontend<br/>Port 3000] -->|HTTPS and HttpOnly cookie| Gateway[Spring Cloud Gateway<br/>Port 9090]
 
     subgraph Private Docker network
         Gateway -->|Auth and user routes| Identity[Identity Service<br/>Port 9092]
@@ -66,10 +66,11 @@ sequenceDiagram
     User->>UI: Login
     UI->>GW: POST /api/v1/auth/login
     GW->>ID: Forward credentials
-    ID-->>UI: Signed JWT with userId and roles
+    ID-->>UI: HttpOnly cookie containing signed JWT
     User->>UI: Create post
-    UI->>GW: POST /api/posts with Bearer JWT
-    GW->>PS: Forward JWT and correlation ID
+    UI->>GW: POST /api/posts with cookie
+    GW->>GW: Convert cookie to internal bearer header
+    GW->>PS: Forward bearer JWT and correlation ID
     PS->>PS: Verify signature and owner claims
     PS->>CS: Validate category using internal token
     CS-->>PS: Category reference
@@ -77,10 +78,12 @@ sequenceDiagram
 ```
 
 - Identity signs JWTs containing issuer, subject, immutable `userId`, and roles.
+- The browser cannot read the JWT; Identity sets an `HttpOnly`, `SameSite` cookie and the gateway removes it after translating it to a bearer header.
 - Post and Content verify the token locally; they do not call Identity for every request.
 - Owner-or-admin rules are enforced in the service that owns the resource.
 - Private reference endpoints use a separate internal credential and are unavailable through the gateway.
 - The HMAC secret is shared during this migration stage. Asymmetric signing and JWKS are a future production hardening step.
+- Production uses `Secure` cookies over HTTPS. The local Minikube profile explicitly disables `Secure` because its documented endpoint is HTTP.
 
 ## Reliability Behavior
 

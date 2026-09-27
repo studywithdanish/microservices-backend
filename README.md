@@ -123,7 +123,7 @@ Frontend -> API Gateway :9090 -> Modular backend :9090 (private Docker network) 
 Implemented gateway capabilities:
 
 - Stable public routing for `/api/**`, Swagger UI, and OpenAPI endpoints
-- Transparent forwarding of JWT bearer tokens to the backend
+- Translation of the browser's HttpOnly authentication cookie into an internal JWT bearer header
 - Validated or generated `X-Correlation-Id` request and response headers
 - Central browser CORS policy with duplicate downstream headers removed
 - Explicit connection and response timeouts

@@ -95,11 +95,11 @@ docker compose config
 docker compose up --build
 ```
 
-After registering and logging in through the gateway, use the token to create a post:
+After registering and logging in through the gateway with `curl -c cookies.txt`, use the session cookie to create a post:
 
 ```bash
 curl -i -X POST http://localhost:9090/api/posts \
-  -H "Authorization: Bearer TOKEN" \
+  -b cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"title":"Phase 4","content":"Posts are independently owned","categoryId":1}'
 ```
@@ -111,7 +111,7 @@ curl -i http://localhost:9090/api/posts
 curl -i http://localhost:9090/api/post/1
 curl -i http://localhost:9090/api/posts/1/comments
 curl -i -X POST http://localhost:9090/api/posts/1/comments \
-  -H "Authorization: Bearer TOKEN" \
+  -b cookies.txt \
   -H "Content-Type: application/json" \
   -d '{"content":"The Comment module validated this through Post Service"}'
 ```
