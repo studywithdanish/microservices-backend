@@ -4,7 +4,6 @@ import com.danish.blog.identity.domain.Role;
 import com.danish.blog.identity.domain.User;
 import com.danish.blog.identity.repository.RoleRepository;
 import com.danish.blog.identity.repository.UserRepository;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,11 +15,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.net.HttpCookie;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -101,20 +102,50 @@ class IdentityFlowIntegrationTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void loginStoresTheJwtInAnHttpOnlyCookieWithoutExposingItInTheBody() throws Exception {
+        userRepository.save(user("danish@example.com", "ROLE_NORMAL"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "username", "danish@example.com",
+                                "password", "password123"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.authenticated").value(true))
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("BLOG_ACCESS_TOKEN="),
+                        org.hamcrest.Matchers.containsString("HttpOnly"),
+                        org.hamcrest.Matchers.containsString("SameSite=Lax")
+                )));
+    }
+
+    @Test
+    void logoutExpiresTheAuthenticationCookie() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isNoContent())
+                .andExpect(header().string("Set-Cookie", org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("BLOG_ACCESS_TOKEN="),
+                        org.hamcrest.Matchers.containsString("Max-Age=0"),
+                        org.hamcrest.Matchers.containsString("HttpOnly")
+                )));
+    }
+
     private String login(String email, String password) throws Exception {
-        String body = mockMvc.perform(post("/api/v1/auth/login")
+        String setCookie = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
                                 "username", email,
                                 "password", password
                         ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.authenticated").value(true))
                 .andReturn()
                 .getResponse()
-                .getContentAsString();
-        JsonNode json = objectMapper.readTree(body);
-        return json.get("token").asText();
+                .getHeader("Set-Cookie");
+        return HttpCookie.parse(setCookie).get(0).getValue();
     }
 
     private Map<String, String> registration(String email) {

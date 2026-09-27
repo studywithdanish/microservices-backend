@@ -35,7 +35,7 @@ foreach ($entry in $images.GetEnumerator()) {
 Write-Host 'Building blog-frontend:k8s with same-origin API routing'
 Invoke-Checked docker @(
     'build',
-    '--build-arg', 'REACT_APP_API_BASE_URL=/',
+    '--build-arg', 'VITE_API_BASE_URL=/',
     '--tag', 'blog-frontend:k8s',
     $frontendRoot
 )

@@ -3,6 +3,7 @@ package com.danish.blog.identity.api;
 import com.danish.blog.identity.domain.User;
 import com.danish.blog.identity.error.ApiException;
 import com.danish.blog.identity.security.CurrentUserProvider;
+import com.danish.blog.identity.security.AuthCookieService;
 import com.danish.blog.identity.security.IdentityUserDetailsService;
 import com.danish.blog.identity.security.JwtPrincipal;
 import com.danish.blog.identity.security.JwtTokenService;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -35,19 +37,22 @@ public class AuthController {
     private final JwtTokenService jwtTokenService;
     private final UserService userService;
     private final CurrentUserProvider currentUserProvider;
+    private final AuthCookieService authCookieService;
 
     public AuthController(
             AuthenticationManager authenticationManager,
             IdentityUserDetailsService userDetailsService,
             JwtTokenService jwtTokenService,
             UserService userService,
-            CurrentUserProvider currentUserProvider
+            CurrentUserProvider currentUserProvider,
+            AuthCookieService authCookieService
     ) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.jwtTokenService = jwtTokenService;
         this.userService = userService;
         this.currentUserProvider = currentUserProvider;
+        this.authCookieService = authCookieService;
     }
 
     @PostMapping("/login")
@@ -63,7 +68,17 @@ public class AuthController {
         }
 
         User user = (User) userDetailsService.loadUserByUsername(email);
-        return ResponseEntity.ok(new JwtAuthResponse(jwtTokenService.generateToken(user)));
+        String token = jwtTokenService.generateToken(user);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, authCookieService.authenticated(token).toString())
+                .body(new JwtAuthResponse(true));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout() {
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, authCookieService.cleared().toString())
+                .build();
     }
 
     @PostMapping("/register")

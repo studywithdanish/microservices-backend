@@ -56,11 +56,14 @@ $loginRequest = @{
     Uri = "$BaseUrl/api/v1/auth/login"
     Headers = $jsonHeaders
     Body = (@{ username = $email; password = $password } | ConvertTo-Json)
+    SessionVariable = 'authSession'
 }
 $login = Invoke-RestMethod @loginRequest
+if (-not $login.authenticated) {
+    throw 'Login did not establish an authenticated session.'
+}
 
-$authorization = @{ Authorization = "Bearer $($login.token)" }
-$currentUser = Invoke-RestMethod -Uri "$BaseUrl/api/v1/auth/me" -Headers $authorization
+$currentUser = Invoke-RestMethod -Uri "$BaseUrl/api/v1/auth/me" -WebSession $authSession
 if ($currentUser.email -ne $email) {
     throw "Authenticated profile email '$($currentUser.email)' did not match '$email'."
 }
@@ -77,7 +80,8 @@ $postBody = @{
 $postRequest = @{
     Method = 'Post'
     Uri = "$BaseUrl/api/posts"
-    Headers = ($jsonHeaders + $authorization)
+    Headers = $jsonHeaders
+    WebSession = $authSession
     Body = $postBody
 }
 $post = Invoke-RestMethod @postRequest
@@ -85,7 +89,7 @@ $post = Invoke-RestMethod @postRequest
 $notification = $null
 $notificationDeadline = (Get-Date).AddSeconds(60)
 do {
-    $notifications = @(Invoke-RestMethod -Uri "$BaseUrl/api/notifications" -Headers $authorization)
+    $notifications = @(Invoke-RestMethod -Uri "$BaseUrl/api/notifications" -WebSession $authSession)
     $notification = $notifications | Where-Object { $_.postId -eq $post.postId } | Select-Object -First 1
     if ($notification) {
         break
@@ -100,7 +104,8 @@ if (-not $notification) {
 $commentRequest = @{
     Method = 'Post'
     Uri = "$BaseUrl/api/posts/$($post.postId)/comments"
-    Headers = ($jsonHeaders + $authorization)
+    Headers = $jsonHeaders
+    WebSession = $authSession
     Body = (@{ content = 'Kubernetes end-to-end smoke test passed.' } | ConvertTo-Json)
 }
 $comment = Invoke-RestMethod @commentRequest
