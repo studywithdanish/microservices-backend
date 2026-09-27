@@ -6,7 +6,7 @@ This runbook verifies the complete application locally without AWS.
 
 - Docker Desktop
 - Git
-- Node.js 20+ and npm 10+
+- Node.js 22.12+ and npm 10+
 - The backend and frontend repositories checked out beside each other
 
 ## 1. Start the backend
