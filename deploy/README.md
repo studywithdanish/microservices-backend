@@ -26,6 +26,8 @@ PostPublished          -> Post Service -> Kafka -> Notification Service
 
 This keeps the first deployment cost-effective and avoids managing a separate API subdomain before it is needed.
 
+This runbook intentionally keeps post images on the existing Docker volume. The application also contains an optional, inactive S3 storage adapter for a later managed-storage rollout; see [AWS S3 image storage](../docs/aws-s3-image-storage.md) for its configuration, IAM, migration, and rollback design.
+
 ## 1. AWS Cost Controls
 
 Before creating the server:

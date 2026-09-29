@@ -38,6 +38,12 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse(exception.getMessage(), false));
     }
 
+    @ExceptionHandler(ImageStorageException.class)
+    public ResponseEntity<ApiResponse> handleImageStorage(ImageStorageException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiResponse(exception.getMessage(), false));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException exception) {
         Map<String, String> errors = new LinkedHashMap<>();
