@@ -2,11 +2,11 @@ package com.danish.blog.post.api;
 
 import com.danish.blog.post.security.CurrentUserProvider;
 import com.danish.blog.post.security.JwtPrincipal;
-import com.danish.blog.post.service.FileService;
+import com.danish.blog.post.service.ImageStorageService;
 import com.danish.blog.post.service.PostService;
+import com.danish.blog.post.service.StoredImage;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 
 @RestController
@@ -32,20 +31,17 @@ import java.util.List;
 public class PostController {
 
     private final PostService postService;
-    private final FileService fileService;
+    private final ImageStorageService imageStorageService;
     private final CurrentUserProvider currentUserProvider;
-    private final String imagePath;
 
     public PostController(
             PostService postService,
-            FileService fileService,
-            CurrentUserProvider currentUserProvider,
-            @Value("${app.image.storage-path}") String imagePath
+            ImageStorageService imageStorageService,
+            CurrentUserProvider currentUserProvider
     ) {
         this.postService = postService;
-        this.fileService = fileService;
+        this.imageStorageService = imageStorageService;
         this.currentUserProvider = currentUserProvider;
-        this.imagePath = imagePath;
     }
 
     @PostMapping("/posts")
@@ -129,8 +125,17 @@ public class PostController {
     ) throws IOException {
         JwtPrincipal actor = currentUserProvider.requireCurrentUser(authentication);
         postService.verifyCanModify(postId, actor);
-        String fileName = fileService.uploadImage(imagePath, image);
-        return ResponseEntity.ok(postService.updateImage(postId, fileName, actor));
+        String imageName = imageStorageService.store(image);
+        try {
+            return ResponseEntity.ok(postService.updateImage(postId, imageName, actor));
+        } catch (RuntimeException exception) {
+            try {
+                imageStorageService.delete(imageName);
+            } catch (RuntimeException cleanupException) {
+                exception.addSuppressed(cleanupException);
+            }
+            throw exception;
+        }
     }
 
     @GetMapping(value = "/post/image/{imageName}", produces = {
@@ -139,8 +144,12 @@ public class PostController {
             "image/webp"
     })
     public void downloadImage(@PathVariable String imageName, HttpServletResponse response) throws IOException {
-        try (InputStream resource = fileService.getResource(imagePath, imageName)) {
-            StreamUtils.copy(resource, response.getOutputStream());
+        try (StoredImage storedImage = imageStorageService.load(imageName)) {
+            response.setContentType(storedImage.contentType());
+            if (storedImage.contentLength() > 0) {
+                response.setContentLengthLong(storedImage.contentLength());
+            }
+            StreamUtils.copy(storedImage.content(), response.getOutputStream());
         }
     }
 }

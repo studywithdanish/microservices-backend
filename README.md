@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, and local Kubernetes deployment are complete. AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, and local Kubernetes deployment are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -19,7 +19,7 @@ flowchart LR
     Gateway --> Notification[Notification Service :9095]
     Identity --> IdentityDb[(Identity MySQL)]
     Post --> PostDb[(Post MySQL)]
-    Post --> Images[(Image volume)]
+    Post --> Images[(Local volume or private S3 bucket)]
     Content --> ContentDb[(Content MySQL)]
     Post -->|Transactional outbox| Kafka[(Apache Kafka)]
     Kafka -->|PostPublished v1| Notification
@@ -76,6 +76,7 @@ Completed improvements:
 - Verified the React registration, login, profile, post, category, and comment flows through the gateway
 - Added a dedicated Minikube deployment with persistent MySQL and image storage, generated runtime secrets, health probes, resource limits, and an end-to-end smoke test
 - Added Apache Kafka in KRaft mode, a durable Post Service outbox, a versioned `PostPublished` event, an idempotent Notification Service consumer, retry/DLT handling, and asynchronous smoke-test coverage
+- Added profile-based post-image storage with a local filesystem default and a private Amazon S3 implementation using the AWS SDK credential chain, SSE-S3 encryption, bounded calls, and unchanged public APIs
 
 ## Documentation Map
 
@@ -87,6 +88,7 @@ Completed improvements:
 - [Phase 4 Post extraction](docs/phase-4-post-service.md)
 - [Phase 5 Content extraction](docs/phase-5-content-service.md)
 - [Phase 6 Kafka events](docs/phase-6-kafka-events.md) — outbox, event contract, delivery guarantees, consumer idempotency, and operations
+- [AWS S3 image storage](docs/aws-s3-image-storage.md) — architecture, configuration, security decisions, rollout, rollback, and interview guidance
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -211,6 +213,7 @@ The API Gateway exposes authenticated reads at `GET /api/notifications` and owne
 - Jenkins
 - Apache Kafka 3.9 in KRaft mode
 - Spring for Apache Kafka
+- AWS SDK for Java 2.x and Amazon S3
 - JUnit 5, Mockito, MockMvc, Spring Security Test
 
 ## Run Locally With Docker
@@ -392,6 +395,8 @@ Important variables:
 - `CONTENT_SERVICE_BASE_URL` (manual non-Docker gateway runs)
 - `CATEGORY_SERVICE_BASE_URL` (manual non-Docker Post Service runs)
 
+The optional S3 image provider also uses `POST_IMAGE_S3_BUCKET`, `AWS_REGION`, and `POST_IMAGE_S3_KEY_PREFIX`. It is enabled only when the Post Service runs with the `aws` profile; see [AWS S3 image storage](docs/aws-s3-image-storage.md).
+
 ## API Documentation
 
 Each MVC business service generates OpenAPI documentation through springdoc when run directly:
@@ -425,6 +430,7 @@ Important deployment behavior:
 - Secrets and environment-specific values are passed through environment variables
 - CORS must be restricted to the deployed frontend URL
 - Actuator exposes only `/actuator/health` and `/actuator/info`
+- Post images remain on the local volume unless the additional `aws` profile and S3 bucket configuration are supplied
 
 For a frontend deployed at `https://your-domain.com`, use:
 
@@ -467,10 +473,12 @@ Security-related improvements already applied:
 
 The remaining deployment path is incremental and cost-aware. It is outside the current local-completion scope:
 
-1. Deploy the gateway, Identity, Post, Content, Notification, and Kafka topology as the stable AWS baseline.
-2. Store runtime configuration as environment variables.
-3. Add a Docker image registry push stage in Jenkins.
-4. Add Terraform for repeatable infrastructure.
+The S3 application adapter is complete but deliberately inactive in the current Docker Compose and Kubernetes environments. No AWS account, bucket, IAM role, or live application was changed.
+
+1. Provision a private S3 bucket and workload IAM role through Terraform.
+2. Deploy the gateway, Identity, Post, Content, Notification, and Kafka topology as the stable AWS baseline.
+3. Store runtime configuration as environment variables or managed configuration and use workload identity for AWS credentials.
+4. Add a Docker image registry push stage in Jenkins.
 5. Add centralized logs and basic metrics.
 6. Add Prometheus and Grafana after the live deployment is stable.
 
