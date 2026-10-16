@@ -1,5 +1,6 @@
 package com.danish.blog.notification.config;
 
+import com.danish.blog.notification.observability.NotificationMetrics;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,13 +30,18 @@ public class KafkaConfig {
     @Bean
     public DefaultErrorHandler kafkaErrorHandler(
             KafkaTemplate<String, String> kafkaTemplate,
-            @Value("${app.kafka.topics.post-published-dlt}") String deadLetterTopic
+            @Value("${app.kafka.topics.post-published-dlt}") String deadLetterTopic,
+            NotificationMetrics metrics
     ) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(
                 kafkaTemplate,
                 (record, exception) -> new TopicPartition(deadLetterTopic, record.partition())
         );
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 2L));
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler((record, exception) -> {
+            metrics.recordDeadLetter();
+            recoverer.accept(record, exception);
+        }, new FixedBackOff(1000L, 2L));
+        errorHandler.setRetryListeners((record, exception, deliveryAttempt) -> metrics.recordRetry());
         errorHandler.addNotRetryableExceptions(IllegalArgumentException.class);
         return errorHandler;
     }

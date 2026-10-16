@@ -133,6 +133,12 @@ class IdentityFlowIntegrationTest {
                 )));
     }
 
+    @Test
+    void prometheusMetricsAreAvailableForInternalScraping() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
+
     private String login(String email, String password) throws Exception {
         String setCookie = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

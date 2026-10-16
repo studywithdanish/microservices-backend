@@ -15,7 +15,11 @@
         reverse_proxy gateway:9090
     }
 
-    handle /actuator/* {
+    handle /actuator/health {
+        reverse_proxy gateway:9090
+    }
+
+    handle /actuator/info {
         reverse_proxy gateway:9090
     }
 

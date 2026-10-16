@@ -2,6 +2,7 @@ package com.danish.blog.identity.api;
 
 import com.danish.blog.identity.domain.User;
 import com.danish.blog.identity.error.ApiException;
+import com.danish.blog.identity.observability.IdentityMetrics;
 import com.danish.blog.identity.security.CurrentUserProvider;
 import com.danish.blog.identity.security.AuthCookieService;
 import com.danish.blog.identity.security.IdentityUserDetailsService;
@@ -38,6 +39,7 @@ public class AuthController {
     private final UserService userService;
     private final CurrentUserProvider currentUserProvider;
     private final AuthCookieService authCookieService;
+    private final IdentityMetrics metrics;
 
     public AuthController(
             AuthenticationManager authenticationManager,
@@ -45,7 +47,8 @@ public class AuthController {
             JwtTokenService jwtTokenService,
             UserService userService,
             CurrentUserProvider currentUserProvider,
-            AuthCookieService authCookieService
+            AuthCookieService authCookieService,
+            IdentityMetrics metrics
     ) {
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
@@ -53,6 +56,7 @@ public class AuthController {
         this.userService = userService;
         this.currentUserProvider = currentUserProvider;
         this.authCookieService = authCookieService;
+        this.metrics = metrics;
     }
 
     @PostMapping("/login")
@@ -63,12 +67,14 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(email, request.password())
             );
         } catch (BadCredentialsException exception) {
+            metrics.recordLoginFailure();
             logger.warn("Failed login attempt for username: {}", email);
             throw new ApiException("Invalid username or password");
         }
 
         User user = (User) userDetailsService.loadUserByUsername(email);
         String token = jwtTokenService.generateToken(user);
+        metrics.recordLoginSuccess();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieService.authenticated(token).toString())
                 .body(new JwtAuthResponse(true));

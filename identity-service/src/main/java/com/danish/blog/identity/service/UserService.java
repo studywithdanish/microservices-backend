@@ -9,6 +9,7 @@ import com.danish.blog.identity.domain.User;
 import com.danish.blog.identity.error.ApiException;
 import com.danish.blog.identity.error.EmailAlreadyExistsException;
 import com.danish.blog.identity.error.ResourceNotFoundException;
+import com.danish.blog.identity.observability.IdentityMetrics;
 import com.danish.blog.identity.repository.RoleRepository;
 import com.danish.blog.identity.repository.UserRepository;
 import com.danish.blog.identity.security.JwtPrincipal;
@@ -31,15 +32,18 @@ public class UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final IdentityMetrics metrics;
 
     public UserService(
             UserRepository userRepository,
             RoleRepository roleRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            IdentityMetrics metrics
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.metrics = metrics;
     }
 
     public UserResponse register(UserRegistrationRequest request) {
@@ -98,7 +102,9 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setAbout(request.about().trim());
         user.getRoles().add(normalRole);
-        return toResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        metrics.recordRegistration();
+        return toResponse(saved);
     }
 
     private User findUser(Integer userId) {

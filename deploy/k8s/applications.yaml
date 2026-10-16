@@ -47,6 +47,11 @@ spec:
                 configMapKeyRef:
                   name: blog-config
                   key: SPRING_PROFILES_ACTIVE
+            - name: METRICS_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: METRICS_ENVIRONMENT
             - name: IDENTITY_DB_URL
               value: jdbc:mysql://identity-mysql:3306/blog_identity?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: IDENTITY_DB_USERNAME
@@ -163,6 +168,11 @@ spec:
                 configMapKeyRef:
                   name: blog-config
                   key: SPRING_PROFILES_ACTIVE
+            - name: METRICS_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: METRICS_ENVIRONMENT
             - name: POST_DB_URL
               value: jdbc:mysql://post-mysql:3306/blog_posts?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: POST_DB_USERNAME
@@ -282,6 +292,11 @@ spec:
                 configMapKeyRef:
                   name: blog-config
                   key: SPRING_PROFILES_ACTIVE
+            - name: METRICS_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: METRICS_ENVIRONMENT
             - name: CONTENT_DB_URL
               value: jdbc:mysql://content-mysql:3306/blog_content?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: CONTENT_DB_USERNAME
@@ -392,6 +407,11 @@ spec:
                 configMapKeyRef:
                   name: blog-config
                   key: SPRING_PROFILES_ACTIVE
+            - name: METRICS_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: METRICS_ENVIRONMENT
             - name: NOTIFICATION_DB_URL
               value: jdbc:mysql://notification-mysql:3306/blog_notifications?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: NOTIFICATION_DB_USERNAME
@@ -500,6 +520,11 @@ spec:
             - name: http
               containerPort: 9090
           env:
+            - name: METRICS_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: METRICS_ENVIRONMENT
             - name: IDENTITY_BASE_URL
               value: http://identity-service:9092
             - name: POST_SERVICE_BASE_URL

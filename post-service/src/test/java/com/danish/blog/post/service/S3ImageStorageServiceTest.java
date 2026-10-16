@@ -2,6 +2,8 @@ package com.danish.blog.post.service;
 
 import com.danish.blog.post.config.S3ImageStorageProperties;
 import com.danish.blog.post.error.ResourceNotFoundException;
+import com.danish.blog.post.observability.PostMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +52,8 @@ class S3ImageStorageServiceTest {
         imageStorage = new S3ImageStorageService(
                 s3Client,
                 properties,
-                new ImageUploadValidator(10 * 1024 * 1024)
+                new ImageUploadValidator(10 * 1024 * 1024),
+                new PostMetrics(new SimpleMeterRegistry())
         );
     }
 

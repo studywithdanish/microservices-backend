@@ -42,6 +42,12 @@ class ContentSecurityAccessTest {
     }
 
     @Test
+    void prometheusMetricsAreAvailableForInternalScraping() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void categoryReadsArePublic() throws Exception {
         mockMvc.perform(get("/api/categories"))
                 .andExpect(status().isOk());

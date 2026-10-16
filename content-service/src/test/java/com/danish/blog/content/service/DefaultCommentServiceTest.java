@@ -5,6 +5,7 @@ import com.danish.blog.content.api.CommentDto;
 import com.danish.blog.content.client.PostReferenceClient;
 import com.danish.blog.content.domain.Comment;
 import com.danish.blog.content.error.ResourceNotFoundException;
+import com.danish.blog.content.observability.ContentMetrics;
 import com.danish.blog.content.repository.CommentRepository;
 import com.danish.blog.content.security.AuthenticatedUser;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,11 +34,14 @@ class DefaultCommentServiceTest {
     @Mock
     private PostReferenceClient postReferenceClient;
 
+    @Mock
+    private ContentMetrics metrics;
+
     private DefaultCommentService commentService;
 
     @BeforeEach
     void setUp() {
-        commentService = new DefaultCommentService(commentRepository, postReferenceClient);
+        commentService = new DefaultCommentService(commentRepository, postReferenceClient, metrics);
     }
 
     @Test

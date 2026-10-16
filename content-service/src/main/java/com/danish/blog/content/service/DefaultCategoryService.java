@@ -4,6 +4,7 @@ import com.danish.blog.content.api.CategoryDto;
 import com.danish.blog.content.api.CategoryRequest;
 import com.danish.blog.content.domain.Category;
 import com.danish.blog.content.error.ResourceNotFoundException;
+import com.danish.blog.content.observability.ContentMetrics;
 import com.danish.blog.content.repository.CategoryRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -16,16 +17,20 @@ import java.util.List;
 public class DefaultCategoryService implements CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final ContentMetrics metrics;
 
-    public DefaultCategoryService(CategoryRepository categoryRepository) {
+    public DefaultCategoryService(CategoryRepository categoryRepository, ContentMetrics metrics) {
         this.categoryRepository = categoryRepository;
+        this.metrics = metrics;
     }
 
     @Override
     public CategoryDto create(CategoryRequest request) {
         Category category = new Category();
         apply(category, request);
-        return toDto(categoryRepository.save(category));
+        Category saved = categoryRepository.save(category);
+        metrics.recordCategoryCreated();
+        return toDto(saved);
     }
 
     @Override
@@ -38,6 +43,7 @@ public class DefaultCategoryService implements CategoryService {
     @Override
     public void delete(Integer categoryId) {
         categoryRepository.delete(findCategory(categoryId));
+        metrics.recordCategoryDeleted();
     }
 
     @Override

@@ -7,6 +7,7 @@ import com.danish.blog.post.api.PostUpdateRequest;
 import com.danish.blog.post.client.CategoryClient;
 import com.danish.blog.post.domain.Post;
 import com.danish.blog.post.error.ApiException;
+import com.danish.blog.post.observability.PostMetrics;
 import com.danish.blog.post.repository.PostRepository;
 import com.danish.blog.post.security.JwtPrincipal;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,12 +40,15 @@ class PostServiceTest {
     @Mock
     private PostEventOutbox postEventOutbox;
 
+    @Mock
+    private PostMetrics metrics;
+
     private PostService postService;
     private Post post;
 
     @BeforeEach
     void setUp() {
-        postService = new PostService(postRepository, categoryClient, postEventOutbox);
+        postService = new PostService(postRepository, categoryClient, postEventOutbox, metrics);
         post = post(10, 1);
     }
 
