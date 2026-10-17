@@ -78,6 +78,7 @@ Completed improvements:
 - Added Apache Kafka in KRaft mode, a durable Post Service outbox, a versioned `PostPublished` event, an idempotent Notification Service consumer, retry/DLT handling, and asynchronous smoke-test coverage
 - Added profile-based post-image storage with a local filesystem default and a private Amazon S3 implementation using the AWS SDK credential chain, SSE-S3 encryption, bounded calls, and unchanged public APIs
 - Added Prometheus-format runtime and low-cardinality business metrics across the gateway and all four business services
+- Added a pinned Prometheus collector with private service discovery, persistent retention, p95 HTTP histograms, recording rules, and production-oriented alerts
 
 ## Documentation Map
 
@@ -91,6 +92,7 @@ Completed improvements:
 - [Phase 6 Kafka events](docs/phase-6-kafka-events.md) — outbox, event contract, delivery guarantees, consumer idempotency, and operations
 - [AWS S3 image storage](docs/aws-s3-image-storage.md) — architecture, configuration, security decisions, rollout, rollback, and interview guidance
 - [Observability Phase 1](docs/observability-phase-1.md) — metrics endpoints, business metric catalogue, security boundaries, and verification
+- [Observability Phase 2](docs/observability-phase-2.md) — Prometheus collection, persistence, PromQL, alerts, validation, and first-response runbooks
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -216,6 +218,7 @@ The API Gateway exposes authenticated reads at `GET /api/notifications` and owne
 - Apache Kafka 3.9 in KRaft mode
 - Spring for Apache Kafka
 - AWS SDK for Java 2.x and Amazon S3
+- Prometheus 3.15
 - JUnit 5, Mockito, MockMvc, Spring Security Test
 
 ## Run Locally With Docker
@@ -226,7 +229,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start all four databases, all four business services, Kafka, and the gateway:
+Start all four databases, all four business services, Kafka, the gateway, and Prometheus:
 
 ```bash
 docker compose up --build
@@ -244,6 +247,8 @@ Health and application info endpoints are available at:
 http://localhost:9090/actuator/health
 http://localhost:9090/actuator/info
 ```
+
+Prometheus runs at `http://localhost:9096`. See [Observability Phase 2](docs/observability-phase-2.md) for target checks, PromQL examples, alerts, and Kubernetes access.
 
 Check container health status:
 
@@ -334,6 +339,7 @@ Pipeline stages:
 - Verify Java and Maven versions
 - Run legacy rollback backend plus Gateway, Identity, Post, Content, and Notification Maven tests
 - Publish JUnit test reports
+- Validate local and production Compose, Kubernetes manifests, and Prometheus scrape/rule configuration
 - Package all five Spring Boot applications, including the retained rollback application
 - Build the five active service images plus the retained rollback image
 - Validate Docker Compose and Kubernetes deployment configuration
@@ -392,6 +398,8 @@ Important variables:
 - `JWT_EXPIRATION_MS`
 - `CORS_ALLOWED_ORIGINS`
 - `GATEWAY_PORT`
+- `PROMETHEUS_PORT`
+- `PROMETHEUS_RETENTION`
 - `IDENTITY_BASE_URL` (manual non-Docker gateway runs)
 - `POST_SERVICE_BASE_URL` (manual non-Docker gateway runs)
 - `CONTENT_SERVICE_BASE_URL` (manual non-Docker gateway runs)
@@ -417,7 +425,7 @@ The API Gateway exposes only safe public Actuator endpoints by default:
 /actuator/info
 ```
 
-These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and future AWS or monitoring integrations. Each private service also has its own container healthcheck.
+These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 15 days of data by default.
 
 ## Production Readiness
 
@@ -473,6 +481,7 @@ Security-related improvements already applied:
 - Production schema managed by Flyway instead of Hibernate auto-create
 - Health endpoint available for Docker, CI/CD, and AWS checks
 - Prometheus-format JVM, HTTP, database, Kafka, and bounded business metrics on every active service
+- Internal Prometheus collection with persistent Docker/Kubernetes storage, reusable recording rules, and alert evaluation
 
 ## Deployment Roadmap
 
@@ -484,8 +493,9 @@ The S3 application adapter is complete but deliberately inactive in the current 
 2. Deploy the gateway, Identity, Post, Content, Notification, and Kafka topology as the stable AWS baseline.
 3. Store runtime configuration as environment variables or managed configuration and use workload identity for AWS credentials.
 4. Add a Docker image registry push stage in Jenkins.
-5. Add centralized logs. The application metrics instrumentation is complete; see `docs/observability-phase-1.md`.
-6. Add Prometheus collection and Grafana dashboards after the live deployment is stable.
+5. Prometheus metrics instrumentation and collection are complete; see `docs/observability-phase-1.md` and `docs/observability-phase-2.md`.
+6. Add provisioned Grafana dashboards using the validated Prometheus recording rules.
+7. Add centralized structured logs and correlation-ID search.
 
 The production Docker Compose and AWS runbook are available in:
 

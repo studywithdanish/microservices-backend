@@ -1,6 +1,6 @@
 # Local Kubernetes Runbook
 
-This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, and MySQL services remain cluster-internal.
+This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, and Prometheus services remain cluster-internal.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ The script performs these steps:
 1. Builds the five active Spring Boot service images and the React/Nginx image.
 2. Loads all images into the selected Minikube profile.
 3. Generates a Kubernetes Secret only when one does not already exist.
-4. Deploys four MySQL StatefulSets and one Kafka StatefulSet with persistent volumes.
+4. Deploys four MySQL StatefulSets, one Kafka StatefulSet, and Prometheus with persistent volumes.
 5. Waits for the databases and Kafka before deploying the services, gateway, and frontend.
 6. Waits until every application Deployment is available.
 
@@ -65,6 +65,12 @@ Then open `http://localhost:18080` or run the full cross-service smoke test from
 
 The smoke test verifies gateway health, registration, login, the authenticated profile, categories, post creation, and comment creation.
 
+Prometheus is internal by default. To inspect targets, rules, and queries, start a separate temporary port-forward and open `http://localhost:19090`:
+
+```powershell
+kubectl -n blog-platform port-forward service/prometheus 19090:9090
+```
+
 Useful diagnostics:
 
 ```powershell
@@ -74,6 +80,7 @@ kubectl -n blog-platform logs deployment/identity-service
 kubectl -n blog-platform logs deployment/post-service
 kubectl -n blog-platform logs deployment/content-service
 kubectl -n blog-platform logs deployment/notification-service
+kubectl -n blog-platform logs deployment/prometheus
 kubectl -n blog-platform logs statefulset/kafka
 ```
 

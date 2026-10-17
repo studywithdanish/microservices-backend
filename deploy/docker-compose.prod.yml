@@ -228,6 +228,34 @@ services:
       SERVER_FORWARD_HEADERS_STRATEGY: framework
     expose:
       - "9090"
+    networks:
+      default:
+        aliases:
+          - api-gateway
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: blog-prod-prometheus
+    depends_on:
+      gateway:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.enable-lifecycle
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9096}:9090"
+    volumes:
+      - ./k8s/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./k8s/prometheus/blog-platform.yml:/etc/prometheus/rules/blog-platform.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:9090/-/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   frontend:
@@ -274,3 +302,4 @@ volumes:
   uploaded_images:
   caddy_data:
   caddy_config:
+  prometheus_data:

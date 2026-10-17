@@ -233,6 +233,34 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     ports:
       - "${GATEWAY_PORT:-9090}:9090"
+    networks:
+      default:
+        aliases:
+          - api-gateway
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: blog-prometheus
+    depends_on:
+      gateway:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --web.enable-lifecycle
+    ports:
+      - "${PROMETHEUS_PORT:-9096}:9090"
+    volumes:
+      - ./deploy/k8s/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/k8s/prometheus/blog-platform.yml:/etc/prometheus/rules/blog-platform.yml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:9090/-/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
 volumes:
@@ -242,3 +270,4 @@ volumes:
   notification_mysql_data:
   kafka_data:
   uploaded_images:
+  prometheus_data:

@@ -8,6 +8,12 @@ resources:
   - kafka.yaml
   - applications.yaml
   - frontend.yaml
+  - prometheus.yaml
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - prometheus/prometheus.yml
+      - prometheus/blog-platform.yml
 labels:
   - includeSelectors: true
     pairs:

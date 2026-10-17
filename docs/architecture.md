@@ -24,6 +24,12 @@ flowchart LR
 
         Post -.->|Category reference lookup<br/>internal service token| Content
         Content -.->|Post reference validation<br/>internal service token| Post
+
+        Prometheus[(Prometheus<br/>15-day TSDB)] -.->|scrape internal metrics| Gateway
+        Prometheus -.->|scrape internal metrics| Identity
+        Prometheus -.->|scrape internal metrics| Post
+        Prometheus -.->|scrape internal metrics| Content
+        Prometheus -.->|scrape internal metrics| Notification
     end
 ```
 
@@ -96,6 +102,15 @@ sequenceDiagram
 - Flyway owns schema creation; production uses Hibernate validation rather than automatic mutation.
 - Post creation atomically records an outbox event, so Kafka downtime does not lose publication intent.
 - Notification consumption is idempotent, and retry exhaustion routes malformed or repeatedly failing events to a DLT.
+
+## Metrics Observability
+
+- Each service exposes Prometheus-format JVM, HTTP, database-pool, Kafka, and bounded business metrics on its private `/actuator/prometheus` endpoint.
+- Prometheus scrapes the five active services every 15 seconds and retains time-series data for 15 days by default.
+- Recording rules precompute request rate, HTTP 5xx ratio, p95 latency, and outbox backlog queries.
+- Alert rules detect service scrape failure, elevated errors or latency, event publication failures, dead-letter events, and Prometheus rule failures.
+- Prometheus is available on port `9096` for local development, loopback-only through an SSH tunnel in production Compose, and through a temporary port-forward in Kubernetes.
+- Grafana visualization is intentionally the next phase; Prometheus collection and queries are validated first.
 
 ## Migration Strategy
 
