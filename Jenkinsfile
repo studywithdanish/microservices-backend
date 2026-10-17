@@ -15,6 +15,7 @@ pipeline {
         POST_IMAGE_NAME = 'blog-post-service'
         CONTENT_IMAGE_NAME = 'blog-content-service'
         NOTIFICATION_IMAGE_NAME = 'blog-notification-service'
+        PROMETHEUS_IMAGE = 'prom/prometheus:v3.15.0'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -116,7 +117,9 @@ pipeline {
             steps {
                 script {
                     runCommand('docker compose config --quiet')
+                    runCommand('docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production.example config --quiet')
                     runCommand('kubectl kustomize deploy/k8s')
+                    validatePrometheusConfiguration()
                 }
             }
         }
@@ -165,4 +168,13 @@ void runCommand(String command) {
     } else {
         bat command
     }
+}
+
+void validatePrometheusConfiguration() {
+    String configDirectory = isUnix()
+            ? "${env.WORKSPACE}/deploy/k8s/prometheus"
+            : "${env.WORKSPACE}\\deploy\\k8s\\prometheus"
+
+    runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check config /etc/prometheus/prometheus.yml")
+    runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check rules /etc/prometheus/blog-platform.yml")
 }

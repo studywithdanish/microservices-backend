@@ -1,0 +1,94 @@
+groups:
+  - name: blog-platform-recording
+    interval: 30s
+    rules:
+      - record: blog:http_requests:rate5m
+        expr: sum by (application) (rate(http_server_requests_seconds_count[5m]))
+
+      - record: blog:http_server_errors:rate5m
+        expr: sum by (application) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+
+      - record: blog:http_server_errors:ratio5m
+        expr: blog:http_server_errors:rate5m / clamp_min(blog:http_requests:rate5m, 0.001)
+
+      - record: blog:http_server_latency:p95_5m
+        expr: histogram_quantile(0.95, sum by (application, le) (rate(http_server_requests_seconds_bucket[5m])))
+
+      - record: blog:outbox_pending:max
+        expr: max by (application) (blog_outbox_pending)
+
+  - name: blog-platform-alerts
+    rules:
+      - alert: BlogServiceDown
+        expr: up{job="blog-services"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "{{ $labels.service }} is not being scraped"
+          description: "Prometheus has been unable to scrape {{ $labels.instance }} for more than two minutes."
+          runbook: docs/observability-phase-2.md#service-down
+
+      - alert: BlogHighHttp5xxRatio
+        expr: (blog:http_server_errors:ratio5m > 0.05) and on (application) (blog:http_requests:rate5m > 0.1)
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High HTTP 5xx ratio for {{ $labels.application }}"
+          description: "More than 5% of requests have returned HTTP 5xx for ten minutes."
+          runbook: docs/observability-phase-2.md#high-http-5xx-ratio
+
+      - alert: BlogHighHttpP95Latency
+        expr: blog:http_server_latency:p95_5m > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High p95 latency for {{ $labels.application }}"
+          description: "The 5-minute p95 server latency has exceeded two seconds for ten minutes."
+          runbook: docs/observability-phase-2.md#high-http-p95-latency
+
+      - alert: BlogOutboxBacklog
+        expr: blog:outbox_pending:max > 50
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Post event outbox backlog is growing"
+          description: "{{ $labels.application }} has more than 50 unpublished events for ten minutes."
+          runbook: docs/observability-phase-2.md#outbox-backlog
+
+      - alert: BlogOutboxPublishFailure
+        expr: sum by (application) (increase(blog_outbox_events_total{outcome="publish_failure"}[5m])) > 0
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Post event publishing failed"
+          description: "At least one outbox event failed to publish during the last five minutes."
+          runbook: docs/observability-phase-2.md#event-publishing-failure
+
+      - alert: BlogKafkaDeadLetterEvent
+        expr: sum by (application) (increase(blog_kafka_post_published_events_total{outcome="dead_letter"}[5m])) > 0
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "A PostPublished event reached the dead-letter topic"
+          description: "Notification processing exhausted its retries during the last five minutes."
+          runbook: docs/observability-phase-2.md#event-publishing-failure
+
+      - alert: PrometheusRuleEvaluationFailure
+        expr: increase(prometheus_rule_evaluation_failures_total[5m]) > 0
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Prometheus rule evaluation is failing"
+          description: "Prometheus reported one or more rule evaluation failures during the last five minutes."
+          runbook: docs/observability-phase-2.md#prometheus-rule-failure

@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -21,8 +21,9 @@ Caddy manages HTTPS certificates automatically. API traffic passes through the g
 /api/categories/**     -> API Gateway -> Content Service -> Content MySQL
 /api/notifications/**  -> API Gateway -> Notification Service -> Notification MySQL
 PostPublished          -> Post Service -> Kafka -> Notification Service
-/actuator/health     -> API Gateway health endpoint
-/actuator/info       -> API Gateway application information
+internal metrics      -> Prometheus -> persistent 15-day time series
+/actuator/health      -> API Gateway health endpoint
+/actuator/info        -> API Gateway application information
 ```
 
 This keeps the first deployment cost-effective and avoids managing a separate API subdomain before it is needed.
@@ -147,8 +148,17 @@ docker compose -f docker-compose.prod.yml --env-file .env logs -f content-servic
 docker compose -f docker-compose.prod.yml --env-file .env logs -f notification-service
 docker compose -f docker-compose.prod.yml --env-file .env logs -f kafka
 docker compose -f docker-compose.prod.yml --env-file .env logs -f gateway
+docker compose -f docker-compose.prod.yml --env-file .env logs -f prometheus
 docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
 ```
+
+Prometheus is not routed through Caddy and binds only to `127.0.0.1:9096` on the server. Inspect it securely from an operator workstation:
+
+```bash
+ssh -L 19090:127.0.0.1:9096 user@your-server
+```
+
+Open `http://localhost:19090` while the tunnel is active. Do not open port `9096` in the cloud firewall.
 
 ## 6. Verify
 
@@ -214,7 +224,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
+I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists time-series data, and evaluates latency, error, availability, outbox, and dead-letter alerts. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 
