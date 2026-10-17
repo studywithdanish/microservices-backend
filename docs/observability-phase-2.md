@@ -163,4 +163,4 @@ docker run --rm --entrypoint promtool `
 
 ## Phase boundary
 
-This phase collects, stores, queries, and evaluates metrics. The next observability phase adds Grafana provisioning and interview-ready service, JVM, Kafka, and business dashboards. Alertmanager routing and centralized logs follow after the dashboards are stable.
+This phase collects, stores, queries, and evaluates metrics. Phase 3 now provisions Grafana and interview-ready service, JVM, Kafka, and business dashboards; see [Observability Phase 3](observability-phase-3.md). Alertmanager routing and centralized logs remain later phases.

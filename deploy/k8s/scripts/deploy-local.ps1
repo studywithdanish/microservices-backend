@@ -42,6 +42,7 @@ if ($LASTEXITCODE -ne 0) {
     $postPassword = [guid]::NewGuid().ToString('N')
     $contentPassword = [guid]::NewGuid().ToString('N')
     $notificationPassword = [guid]::NewGuid().ToString('N')
+    $grafanaPassword = [guid]::NewGuid().ToString('N')
 
     Invoke-Checked kubectl @(
         '-n', $namespace, 'create', 'secret', 'generic', 'blog-secrets',
@@ -54,17 +55,26 @@ if ($LASTEXITCODE -ne 0) {
         "--from-literal=CONTENT_DB_PASSWORD=$contentPassword",
         "--from-literal=CONTENT_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))",
         "--from-literal=NOTIFICATION_DB_PASSWORD=$notificationPassword",
-        "--from-literal=NOTIFICATION_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))"
+        "--from-literal=NOTIFICATION_MYSQL_ROOT_PASSWORD=$([guid]::NewGuid().ToString('N'))",
+        "--from-literal=GRAFANA_ADMIN_PASSWORD=$grafanaPassword"
     )
 } else {
     Write-Host 'Reusing the existing blog-secrets Secret.'
+    $secretUpdates = @{}
     $notificationSecret = (& kubectl -n $namespace get secret blog-secrets -o 'jsonpath={.data.NOTIFICATION_DB_PASSWORD}').Trim()
     if (-not $notificationSecret) {
+        $secretUpdates.NOTIFICATION_DB_PASSWORD = [guid]::NewGuid().ToString('N')
+        $secretUpdates.NOTIFICATION_MYSQL_ROOT_PASSWORD = [guid]::NewGuid().ToString('N')
+    }
+
+    $grafanaSecret = (& kubectl -n $namespace get secret blog-secrets -o 'jsonpath={.data.GRAFANA_ADMIN_PASSWORD}').Trim()
+    if (-not $grafanaSecret) {
+        $secretUpdates.GRAFANA_ADMIN_PASSWORD = [guid]::NewGuid().ToString('N')
+    }
+
+    if ($secretUpdates.Count -gt 0) {
         $secretPatch = @{
-            stringData = @{
-                NOTIFICATION_DB_PASSWORD = [guid]::NewGuid().ToString('N')
-                NOTIFICATION_MYSQL_ROOT_PASSWORD = [guid]::NewGuid().ToString('N')
-            }
+            stringData = $secretUpdates
         } | ConvertTo-Json -Compress
         Invoke-Checked kubectl @(
             '-n', $namespace, 'patch', 'secret', 'blog-secrets',
@@ -84,13 +94,9 @@ foreach ($database in @('identity-mysql', 'post-mysql', 'content-mysql', 'notifi
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "statefulset/$database", '--timeout=300s')
 }
 
-Invoke-Checked kubectl @(
-    '-n', $namespace, 'apply',
-    '-f', (Join-Path $k8sRoot 'applications.yaml'),
-    '-f', (Join-Path $k8sRoot 'frontend.yaml')
-)
+Invoke-Checked kubectl @('apply', '-k', $k8sRoot)
 
-foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend')) {
+foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'prometheus', 'grafana')) {
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "deployment/$deployment", '--timeout=300s')
 }
 
@@ -99,3 +105,5 @@ Write-Host ''
 Write-Host 'Kubernetes deployment completed successfully.'
 Write-Host "Application URL: http://${minikubeIp}:30080"
 Write-Host "Run the smoke test: .\deploy\k8s\scripts\smoke-test.ps1 -Profile $Profile"
+Write-Host 'Grafana access: kubectl -n blog-platform port-forward service/grafana 13001:3000'
+Write-Host 'Grafana password (PowerShell): $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.GRAFANA_ADMIN_PASSWORD}"; [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))'
