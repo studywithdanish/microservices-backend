@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first three observability phases (metrics, Prometheus, and Grafana) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first four observability phases (metrics, Prometheus, Grafana, and Alertmanager) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -25,6 +25,8 @@ flowchart LR
     Kafka -->|PostPublished v1| Notification
     Notification --> NotificationDb[(Notification MySQL)]
     Grafana[Grafana dashboards] --> Prometheus[(Prometheus)]
+    Prometheus --> Alertmanager[Alertmanager routing]
+    Alertmanager --> Operator[Operator email]
     Prometheus -. private metrics .-> Gateway
     Prometheus -. private metrics .-> Identity
     Prometheus -. private metrics .-> Post
@@ -86,6 +88,7 @@ Completed improvements:
 - Added Prometheus-format runtime and low-cardinality business metrics across the gateway and all four business services
 - Added a pinned Prometheus collector with private service discovery, persistent retention, p95 HTTP histograms, recording rules, and production-oriented alerts
 - Added a pinned Grafana deployment with a provisioned Prometheus datasource and version-controlled platform, event-pipeline, and per-service dashboards
+- Added pinned Alertmanager routing with severity-based email delivery, alert grouping, inhibition, silences, local Mailpit verification, and a secret-backed production SMTP template
 
 ## Documentation Map
 
@@ -101,6 +104,7 @@ Completed improvements:
 - [Observability Phase 1](docs/observability-phase-1.md) — metrics endpoints, business metric catalogue, security boundaries, and verification
 - [Observability Phase 2](docs/observability-phase-2.md) — Prometheus collection, persistence, PromQL, alerts, validation, and first-response runbooks
 - [Observability Phase 3](docs/observability-phase-3.md) — provisioned Grafana, operator dashboards, secure access, incident workflow, and validation
+- [Observability Phase 4](docs/observability-phase-4.md) — Alertmanager routing, inhibition, silences, email delivery, secure SMTP, and operational runbooks
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -228,6 +232,8 @@ The API Gateway exposes authenticated reads at `GET /api/notifications` and owne
 - AWS SDK for Java 2.x and Amazon S3
 - Prometheus 3.15
 - Grafana 13.2
+- Alertmanager 0.34
+- Mailpit 1.31 for local notification capture
 - JUnit 5, Mockito, MockMvc, Spring Security Test
 
 ## Run Locally With Docker
@@ -238,7 +244,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start all four databases, all four business services, Kafka, the gateway, Prometheus, and Grafana:
+Start all four databases, all four business services, Kafka, the gateway, Prometheus, Grafana, Alertmanager, and the local alert inbox:
 
 ```bash
 docker compose up --build
@@ -260,6 +266,8 @@ http://localhost:9090/actuator/info
 Prometheus runs at `http://localhost:9096`. See [Observability Phase 2](docs/observability-phase-2.md) for target checks, PromQL examples, alerts, and Kubernetes access.
 
 Grafana runs at `http://localhost:3001`. Set a private `GRAFANA_ADMIN_PASSWORD` in `.env`, then see [Observability Phase 3](docs/observability-phase-3.md) for the dashboards, Kubernetes access, and incident workflow.
+
+Alertmanager runs at `http://localhost:9097`, and routed local email notifications appear at `http://localhost:8025`. See [Observability Phase 4](docs/observability-phase-4.md) for the delivery smoke test, routing policy, Kubernetes access, and production SMTP setup.
 
 Check container health status:
 
@@ -350,7 +358,7 @@ Pipeline stages:
 - Verify Java and Maven versions
 - Run legacy rollback backend plus Gateway, Identity, Post, Content, and Notification Maven tests
 - Publish JUnit test reports
-- Validate local and production Compose, Kubernetes manifests, Prometheus scrape/rule configuration, and Grafana dashboard JSON
+- Validate local and production Compose, Kubernetes manifests, Prometheus scrape/rule configuration, Grafana dashboard JSON, and both Alertmanager routing configurations
 - Package all five Spring Boot applications, including the retained rollback application
 - Build the five active service images plus the retained rollback image
 - Validate Docker Compose and Kubernetes deployment configuration
@@ -436,7 +444,7 @@ The API Gateway exposes only safe public Actuator endpoints by default:
 /actuator/info
 ```
 
-These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 15 days of data by default. Grafana queries Prometheus privately and provides authenticated operator dashboards; it is not embedded in the public React application.
+These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 15 days of data by default. Grafana queries Prometheus privately and provides authenticated operator dashboards. Alertmanager receives evaluated alerts and applies grouping, inhibition, silences, and severity routing. None of these operator tools is embedded in the public React application.
 
 ## Production Readiness
 
@@ -451,7 +459,7 @@ Important deployment behavior:
 - Secrets and environment-specific values are passed through environment variables
 - CORS must be restricted to the deployed frontend URL
 - The public reverse proxy exposes only `/actuator/health` and `/actuator/info`; internal service ports also expose `/actuator/prometheus`
-- Production Prometheus and Grafana bind to loopback and require an authenticated SSH tunnel; Kubernetes uses temporary operator port-forwards
+- Production Prometheus, Grafana, and Alertmanager bind to loopback and require an authenticated SSH tunnel; Kubernetes uses temporary operator port-forwards
 - Post images remain on the local volume unless the additional `aws` profile and S3 bucket configuration are supplied
 
 For a frontend deployed at `https://your-domain.com`, use:
@@ -495,6 +503,7 @@ Security-related improvements already applied:
 - Prometheus-format JVM, HTTP, database, Kafka, and bounded business metrics on every active service
 - Internal Prometheus collection with persistent Docker/Kubernetes storage, reusable recording rules, and alert evaluation
 - Git-provisioned Grafana datasource and dashboards with anonymous access disabled and persistent Docker/Kubernetes state
+- Alertmanager receiver routing, noise inhibition, local SMTP delivery testing, and a production SMTP password-file pattern
 
 ## Deployment Roadmap
 
@@ -508,7 +517,8 @@ The S3 application adapter is complete but deliberately inactive in the current 
 4. Add a Docker image registry push stage in Jenkins.
 5. Prometheus metrics instrumentation and collection are complete; see `docs/observability-phase-1.md` and `docs/observability-phase-2.md`.
 6. Provisioned Grafana dashboards are complete; see `docs/observability-phase-3.md`.
-7. Add alert notification routing and centralized structured logs with correlation-ID search in later observability phases.
+7. Alertmanager notification routing is complete; see `docs/observability-phase-4.md`.
+8. Add centralized structured logs with correlation-ID search in the next observability phase.
 
 The production Docker Compose and AWS runbook are available in:
 
@@ -537,6 +547,6 @@ Implemented migration strategy:
 5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
 6. Added reliable asynchronous publication with a transactional outbox and idempotent Kafka consumer.
 
-Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, alert routing, centralized logs/traces, and managed-cloud Kubernetes only when operational scale justifies it.
+Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, centralized logs/traces, SLO automation, and managed-cloud Kubernetes only when operational scale justifies it.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.

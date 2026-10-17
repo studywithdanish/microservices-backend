@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, Grafana, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, Grafana, Alertmanager, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -23,6 +23,7 @@ Caddy manages HTTPS certificates automatically. API traffic passes through the g
 PostPublished          -> Post Service -> Kafka -> Notification Service
 internal metrics      -> Prometheus -> persistent 15-day time series
 operator dashboards   -> Grafana -> Prometheus queries
+evaluated alerts      -> Alertmanager -> external SMTP -> operators
 /actuator/health      -> API Gateway health endpoint
 /actuator/info        -> API Gateway application information
 ```
@@ -126,6 +127,18 @@ Generate a strong JWT secret:
 openssl rand -base64 64
 ```
 
+Configure the production alert receiver before starting Compose:
+
+```bash
+cp k8s/alertmanager/alertmanager.production.example.yml \
+   k8s/alertmanager/alertmanager.production.yml
+mkdir -p secrets
+printf '%s' 'SMTP_PASSWORD_FROM_SECRET_MANAGER' > secrets/alertmanager-smtp-password
+chmod 600 secrets/alertmanager-smtp-password
+```
+
+Replace the example SMTP host, sender, and recipients in `alertmanager.production.yml`. Neither the rendered configuration nor the password file is committed. See [Observability Phase 4](../docs/observability-phase-4.md) for the full routing and secret-management model.
+
 ## 5. Deploy
 
 Build and start the stack:
@@ -152,6 +165,7 @@ docker compose -f docker-compose.prod.yml --env-file .env logs -f kafka
 docker compose -f docker-compose.prod.yml --env-file .env logs -f gateway
 docker compose -f docker-compose.prod.yml --env-file .env logs -f prometheus
 docker compose -f docker-compose.prod.yml --env-file .env logs -f grafana
+docker compose -f docker-compose.prod.yml --env-file .env logs -f alertmanager
 docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
 ```
 
@@ -170,6 +184,14 @@ ssh -L 13001:127.0.0.1:3001 user@your-server
 ```
 
 Open `http://localhost:13001`, sign in with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`, and inspect the provisioned **Blog Platform** dashboards. Do not open port `3001` in the cloud firewall.
+
+Alertmanager is also loopback-only. Open another authenticated tunnel when managing alerts or silences:
+
+```bash
+ssh -L 19093:127.0.0.1:9097 user@your-server
+```
+
+Open `http://localhost:19093`. Do not open port `9097` in the cloud firewall.
 
 ## 6. Verify
 
@@ -235,7 +257,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists time-series data, and evaluates latency, error, availability, outbox, and dead-letter alerts. Grafana is provisioned from Git with platform, event-pipeline, and per-service dashboards and is available only through an operator SSH tunnel. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, Grafana, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
+I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists time-series data, and evaluates latency, error, availability, outbox, and dead-letter alerts. Grafana is provisioned from Git with platform, event-pipeline, and per-service dashboards. Alertmanager groups, deduplicates, inhibits, and routes alerts to operators through authenticated SMTP. All three operator interfaces are available only through SSH tunnels. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables or mounted secret files. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, Grafana, Alertmanager, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 

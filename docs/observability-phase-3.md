@@ -116,4 +116,4 @@ Then confirm that the **Blog Platform** folder contains all three dashboards and
 
 ## Phase boundary
 
-Phase 3 provides repeatable visualization and an investigation workflow. It does not send notifications or centralize application logs. Alert routing and searchable structured logs remain later observability phases.
+Phase 3 provides repeatable visualization and an investigation workflow. Phase 4 now adds Alertmanager grouping, inhibition, silencing, severity routing, and local/production email delivery; see [Observability Phase 4](observability-phase-4.md). Searchable structured logs remain a later phase.

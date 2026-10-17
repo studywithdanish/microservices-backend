@@ -36,6 +36,7 @@ groups:
         labels:
           severity: warning
           team: backend
+          service: "{{ $labels.application }}"
         annotations:
           summary: "High HTTP 5xx ratio for {{ $labels.application }}"
           description: "More than 5% of requests have returned HTTP 5xx for ten minutes."
@@ -47,6 +48,7 @@ groups:
         labels:
           severity: warning
           team: backend
+          service: "{{ $labels.application }}"
         annotations:
           summary: "High p95 latency for {{ $labels.application }}"
           description: "The 5-minute p95 server latency has exceeded two seconds for ten minutes."
@@ -58,6 +60,7 @@ groups:
         labels:
           severity: warning
           team: backend
+          service: "{{ $labels.application }}"
         annotations:
           summary: "Post event outbox backlog is growing"
           description: "{{ $labels.application }} has more than 50 unpublished events for ten minutes."
@@ -68,6 +71,7 @@ groups:
         labels:
           severity: warning
           team: backend
+          service: "{{ $labels.application }}"
         annotations:
           summary: "Post event publishing failed"
           description: "At least one outbox event failed to publish during the last five minutes."
@@ -78,6 +82,7 @@ groups:
         labels:
           severity: warning
           team: backend
+          service: "{{ $labels.application }}"
         annotations:
           summary: "A PostPublished event reached the dead-letter topic"
           description: "Notification processing exhausted its retries during the last five minutes."
@@ -92,3 +97,38 @@ groups:
           summary: "Prometheus rule evaluation is failing"
           description: "Prometheus reported one or more rule evaluation failures during the last five minutes."
           runbook: docs/observability-phase-2.md#prometheus-rule-failure
+
+      - alert: AlertmanagerDown
+        expr: up{job="monitoring", component="alertmanager"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+          service: alertmanager
+        annotations:
+          summary: "Alertmanager is not reachable"
+          description: "Prometheus has been unable to deliver alerts to Alertmanager for more than two minutes."
+          runbook: docs/observability-phase-4.md#alertmanager-down
+
+      - alert: AlertmanagerNotificationFailure
+        expr: increase(alertmanager_notifications_failed_total[5m]) > 0
+        labels:
+          severity: critical
+          team: platform
+          service: alertmanager
+        annotations:
+          summary: "Alertmanager notification delivery is failing"
+          description: "At least one receiver notification failed during the last five minutes."
+          runbook: docs/observability-phase-4.md#notification-delivery-failure
+
+      - alert: AlertmanagerConfigReloadFailure
+        expr: alertmanager_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+          service: alertmanager
+        annotations:
+          summary: "Alertmanager configuration reload failed"
+          description: "Alertmanager has rejected its current configuration for at least five minutes."
+          runbook: docs/observability-phase-4.md#configuration-reload-failure

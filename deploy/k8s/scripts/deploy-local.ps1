@@ -96,7 +96,7 @@ foreach ($database in @('identity-mysql', 'post-mysql', 'content-mysql', 'notifi
 
 Invoke-Checked kubectl @('apply', '-k', $k8sRoot)
 
-foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'prometheus', 'grafana')) {
+foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'mailpit', 'alertmanager', 'prometheus', 'grafana')) {
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "deployment/$deployment", '--timeout=300s')
 }
 
@@ -107,3 +107,5 @@ Write-Host "Application URL: http://${minikubeIp}:30080"
 Write-Host "Run the smoke test: .\deploy\k8s\scripts\smoke-test.ps1 -Profile $Profile"
 Write-Host 'Grafana access: kubectl -n blog-platform port-forward service/grafana 13001:3000'
 Write-Host 'Grafana password (PowerShell): $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.GRAFANA_ADMIN_PASSWORD}"; [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))'
+Write-Host 'Alertmanager access: kubectl -n blog-platform port-forward service/alertmanager 19093:9093'
+Write-Host 'Local alert inbox: kubectl -n blog-platform port-forward service/mailpit 18025:8025'

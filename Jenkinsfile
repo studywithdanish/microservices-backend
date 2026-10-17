@@ -16,6 +16,7 @@ pipeline {
         CONTENT_IMAGE_NAME = 'blog-content-service'
         NOTIFICATION_IMAGE_NAME = 'blog-notification-service'
         PROMETHEUS_IMAGE = 'prom/prometheus:v3.15.0'
+        ALERTMANAGER_IMAGE = 'prom/alertmanager:v0.34.1'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -120,6 +121,7 @@ pipeline {
                     runCommand('docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production.example config --quiet')
                     runCommand('kubectl kustomize deploy/k8s')
                     validatePrometheusConfiguration()
+                    validateAlertmanagerConfiguration()
                 }
             }
         }
@@ -177,4 +179,13 @@ void validatePrometheusConfiguration() {
 
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check config /etc/prometheus/prometheus.yml")
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check rules /etc/prometheus/blog-platform.yml")
+}
+
+void validateAlertmanagerConfiguration() {
+    String configDirectory = isUnix()
+            ? "${env.WORKSPACE}/deploy/k8s/alertmanager"
+            : "${env.WORKSPACE}\\deploy\\k8s\\alertmanager"
+
+    runCommand("docker run --rm --entrypoint amtool -v \"${configDirectory}:/etc/alertmanager:ro\" ${env.ALERTMANAGER_IMAGE} check-config /etc/alertmanager/alertmanager.yml")
+    runCommand("docker run --rm --entrypoint amtool -v \"${configDirectory}:/etc/alertmanager:ro\" ${env.ALERTMANAGER_IMAGE} check-config /etc/alertmanager/alertmanager.production.example.yml")
 }

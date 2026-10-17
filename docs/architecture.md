@@ -31,6 +31,8 @@ flowchart LR
         Prometheus -.->|scrape internal metrics| Content
         Prometheus -.->|scrape internal metrics| Notification
         Grafana[Grafana<br/>operator dashboards] -->|PromQL| Prometheus
+        Prometheus -->|firing/resolved alerts| Alertmanager[Alertmanager<br/>routing and silences]
+        Alertmanager -->|local SMTP| Mailpit[Mailpit<br/>operator inbox]
     end
 ```
 
@@ -113,6 +115,9 @@ sequenceDiagram
 - Prometheus is available on port `9096` for local development, loopback-only through an SSH tunnel in production Compose, and through a temporary port-forward in Kubernetes.
 - Grafana is provisioned from Git with platform overview, Kafka/outbox, and per-service JVM/database dashboards.
 - Grafana is available on port `3001` for local development and only through an SSH tunnel or Kubernetes port-forward in production-style environments.
+- Alertmanager groups, deduplicates, inhibits, silences, and routes Prometheus alerts by severity. Critical notifications repeat more frequently than warnings.
+- Mailpit captures local email delivery for deterministic testing; production uses an authenticated external SMTP relay with its password mounted from a secret file.
+- Alertmanager is available on port `9097` for local development and only through an SSH tunnel or Kubernetes port-forward in production-style environments.
 - Metrics identify the failing component and time window; later centralized-log and trace phases provide detailed request evidence.
 
 ## Migration Strategy

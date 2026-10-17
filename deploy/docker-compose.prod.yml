@@ -234,11 +234,36 @@ services:
           - api-gateway
     restart: unless-stopped
 
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    container_name: blog-prod-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.enable-lifecycle
+      - --cluster.listen-address=
+      - --enable-feature=utf8-strict-mode
+    ports:
+      - "127.0.0.1:${ALERTMANAGER_PORT:-9097}:9093"
+    volumes:
+      - ./k8s/alertmanager/alertmanager.production.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./k8s/alertmanager/blog-platform.tmpl:/etc/alertmanager/templates/blog-platform.tmpl:ro
+      - ./secrets/alertmanager-smtp-password:/run/secrets/alertmanager-smtp-password:ro
+      - alertmanager_data:/alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:9093/-/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v3.15.0
     container_name: blog-prod-prometheus
     depends_on:
       gateway:
+        condition: service_healthy
+      alertmanager:
         condition: service_healthy
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -333,3 +358,4 @@ volumes:
   caddy_config:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
