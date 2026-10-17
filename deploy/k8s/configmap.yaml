@@ -4,6 +4,7 @@ metadata:
   name: blog-config
 data:
   SPRING_PROFILES_ACTIVE: prod
+  METRICS_ENVIRONMENT: local-kubernetes
   IDENTITY_MYSQL_DATABASE: blog_identity
   IDENTITY_DB_USERNAME: identity_user
   POST_MYSQL_DATABASE: blog_posts

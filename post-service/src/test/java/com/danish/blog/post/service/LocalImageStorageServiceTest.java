@@ -2,6 +2,8 @@ package com.danish.blog.post.service;
 
 import com.danish.blog.post.error.ApiException;
 import com.danish.blog.post.error.ResourceNotFoundException;
+import com.danish.blog.post.observability.PostMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockMultipartFile;
@@ -100,7 +102,8 @@ class LocalImageStorageServiceTest {
     private LocalImageStorageService imageStorage() {
         return new LocalImageStorageService(
                 new ImageUploadValidator(10 * 1024 * 1024),
-                storageDirectory.toString()
+                storageDirectory.toString(),
+                new PostMetrics(new SimpleMeterRegistry())
         );
     }
 }

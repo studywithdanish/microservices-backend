@@ -5,6 +5,7 @@ import com.danish.blog.content.api.CommentDto;
 import com.danish.blog.content.client.PostReferenceClient;
 import com.danish.blog.content.domain.Comment;
 import com.danish.blog.content.error.ResourceNotFoundException;
+import com.danish.blog.content.observability.ContentMetrics;
 import com.danish.blog.content.repository.CommentRepository;
 import com.danish.blog.content.security.AuthenticatedUser;
 import org.springframework.security.access.AccessDeniedException;
@@ -19,10 +20,16 @@ public class DefaultCommentService implements CommentService {
 
     private final CommentRepository commentRepository;
     private final PostReferenceClient postReferenceClient;
+    private final ContentMetrics metrics;
 
-    public DefaultCommentService(CommentRepository commentRepository, PostReferenceClient postReferenceClient) {
+    public DefaultCommentService(
+            CommentRepository commentRepository,
+            PostReferenceClient postReferenceClient,
+            ContentMetrics metrics
+    ) {
         this.commentRepository = commentRepository;
         this.postReferenceClient = postReferenceClient;
+        this.metrics = metrics;
     }
 
     @Override
@@ -32,7 +39,9 @@ public class DefaultCommentService implements CommentService {
         comment.setContent(request.content().trim());
         comment.setPostId(postId);
         comment.setAuthorId(actor.id());
-        return toDto(commentRepository.save(comment));
+        Comment saved = commentRepository.save(comment);
+        metrics.recordCommentCreated();
+        return toDto(saved);
     }
 
     @Override
@@ -50,6 +59,7 @@ public class DefaultCommentService implements CommentService {
             throw new AccessDeniedException("You cannot delete another user's comment");
         }
         commentRepository.delete(comment);
+        metrics.recordCommentDeleted();
     }
 
     private void requirePost(Integer postId) {

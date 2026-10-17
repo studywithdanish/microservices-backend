@@ -2,6 +2,7 @@ package com.danish.blog.post.service;
 
 import com.danish.blog.post.error.ImageStorageException;
 import com.danish.blog.post.error.ResourceNotFoundException;
+import com.danish.blog.post.observability.PostMetrics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -24,17 +25,24 @@ public class LocalImageStorageService implements ImageStorageService {
 
     private final ImageUploadValidator validator;
     private final Path storageRoot;
+    private final PostMetrics metrics;
 
     public LocalImageStorageService(
             ImageUploadValidator validator,
-            @Value("${app.image.storage.local-path:${POST_IMAGE_PATH:images/}}") String storagePath
+            @Value("${app.image.storage.local-path:${POST_IMAGE_PATH:images/}}") String storagePath,
+            PostMetrics metrics
     ) {
         this.validator = validator;
         this.storageRoot = Paths.get(storagePath).toAbsolutePath().normalize();
+        this.metrics = metrics;
     }
 
     @Override
     public String store(MultipartFile image) {
+        return metrics.recordImageOperation("local", "store", () -> storeImage(image));
+    }
+
+    private String storeImage(MultipartFile image) {
         ImageUploadValidator.ValidatedImage validated = validator.validate(image);
         String imageName = UUID.randomUUID() + validated.extension();
         try {
@@ -50,6 +58,10 @@ public class LocalImageStorageService implements ImageStorageService {
 
     @Override
     public StoredImage load(String imageName) {
+        return metrics.recordImageOperation("local", "load", () -> loadImage(imageName));
+    }
+
+    private StoredImage loadImage(String imageName) {
         Path resource = resolveExistingImage(imageName);
         try {
             return new StoredImage(
@@ -64,6 +76,10 @@ public class LocalImageStorageService implements ImageStorageService {
 
     @Override
     public void delete(String imageName) {
+        metrics.recordImageOperation("local", "delete", () -> deleteImage(imageName));
+    }
+
+    private void deleteImage(String imageName) {
         validator.validateStoredName(imageName);
         Path resource = storageRoot.resolve(imageName).normalize();
         if (!resource.startsWith(storageRoot)) {

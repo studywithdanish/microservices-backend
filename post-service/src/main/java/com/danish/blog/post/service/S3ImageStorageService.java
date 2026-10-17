@@ -3,6 +3,7 @@ package com.danish.blog.post.service;
 import com.danish.blog.post.config.S3ImageStorageProperties;
 import com.danish.blog.post.error.ImageStorageException;
 import com.danish.blog.post.error.ResourceNotFoundException;
+import com.danish.blog.post.observability.PostMetrics;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,19 +30,26 @@ public class S3ImageStorageService implements ImageStorageService {
     private final S3Client s3Client;
     private final S3ImageStorageProperties properties;
     private final ImageUploadValidator validator;
+    private final PostMetrics metrics;
 
     public S3ImageStorageService(
             S3Client s3Client,
             S3ImageStorageProperties properties,
-            ImageUploadValidator validator
+            ImageUploadValidator validator,
+            PostMetrics metrics
     ) {
         this.s3Client = s3Client;
         this.properties = properties;
         this.validator = validator;
+        this.metrics = metrics;
     }
 
     @Override
     public String store(MultipartFile image) {
+        return metrics.recordImageOperation("s3", "store", () -> storeImage(image));
+    }
+
+    private String storeImage(MultipartFile image) {
         ImageUploadValidator.ValidatedImage validated = validator.validate(image);
         String imageName = UUID.randomUUID() + validated.extension();
         PutObjectRequest request = PutObjectRequest.builder()
@@ -62,6 +70,10 @@ public class S3ImageStorageService implements ImageStorageService {
 
     @Override
     public StoredImage load(String imageName) {
+        return metrics.recordImageOperation("s3", "load", () -> loadImage(imageName));
+    }
+
+    private StoredImage loadImage(String imageName) {
         validator.validateStoredName(imageName);
         try {
             ResponseInputStream<GetObjectResponse> response = s3Client.getObject(GetObjectRequest.builder()
@@ -86,6 +98,10 @@ public class S3ImageStorageService implements ImageStorageService {
 
     @Override
     public void delete(String imageName) {
+        metrics.recordImageOperation("s3", "delete", () -> deleteImage(imageName));
+    }
+
+    private void deleteImage(String imageName) {
         validator.validateStoredName(imageName);
         try {
             s3Client.deleteObject(DeleteObjectRequest.builder()

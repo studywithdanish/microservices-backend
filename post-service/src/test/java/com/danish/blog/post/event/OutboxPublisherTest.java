@@ -2,6 +2,7 @@ package com.danish.blog.post.event;
 
 import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.repository.OutboxEventRepository;
+import com.danish.blog.post.observability.OutboxMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +30,9 @@ class OutboxPublisherTest {
     @Mock
     private KafkaTemplate<String, String> kafkaTemplate;
 
+    @Mock
+    private OutboxMetrics metrics;
+
     private OutboxPublisher publisher;
     private OutboxEvent event;
 
@@ -38,7 +42,8 @@ class OutboxPublisherTest {
                 outboxEventRepository,
                 kafkaTemplate,
                 "blog.posts.published.v1",
-                1
+                1,
+                metrics
         );
         event = OutboxEvent.pending(
                 UUID.randomUUID(),

@@ -46,10 +46,14 @@ spring:
           trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:127\.0\.0\.1|10\..*|172\.(1[6-9]|2[0-9]|3[0-1])\..*|192\.168\..*}
 
 management:
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       probes:
@@ -57,6 +61,11 @@ management:
   info:
     env:
       enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${METRICS_ENVIRONMENT:${spring.profiles.active:default}}
+      instance: ${METRICS_INSTANCE:${HOSTNAME:local}}
 
 info:
   app:

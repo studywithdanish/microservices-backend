@@ -59,7 +59,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/actuator/health",
-                                "/actuator/info"
+                                "/actuator/info",
+                                "/actuator/prometheus"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/users", "/api/users/").hasRole("ADMIN")

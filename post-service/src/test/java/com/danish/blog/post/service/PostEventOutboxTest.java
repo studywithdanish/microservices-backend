@@ -3,6 +3,7 @@ package com.danish.blog.post.service;
 import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.domain.Post;
 import com.danish.blog.post.event.PostPublishedEvent;
+import com.danish.blog.post.observability.OutboxMetrics;
 import com.danish.blog.post.repository.OutboxEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -22,10 +23,13 @@ class PostEventOutboxTest {
     @Mock
     private OutboxEventRepository outboxEventRepository;
 
+    @Mock
+    private OutboxMetrics metrics;
+
     @Test
     void storesVersionedPostPublishedPayload() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        PostEventOutbox outbox = new PostEventOutbox(outboxEventRepository, objectMapper);
+        PostEventOutbox outbox = new PostEventOutbox(outboxEventRepository, objectMapper, metrics);
         Post post = new Post();
         post.setId(42);
         post.setAuthorId(7);

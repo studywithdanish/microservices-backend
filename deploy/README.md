@@ -21,7 +21,8 @@ Caddy manages HTTPS certificates automatically. API traffic passes through the g
 /api/categories/**     -> API Gateway -> Content Service -> Content MySQL
 /api/notifications/**  -> API Gateway -> Notification Service -> Notification MySQL
 PostPublished          -> Post Service -> Kafka -> Notification Service
-/actuator/**         -> API Gateway health endpoints
+/actuator/health     -> API Gateway health endpoint
+/actuator/info       -> API Gateway application information
 ```
 
 This keeps the first deployment cost-effective and avoids managing a separate API subdomain before it is needed.

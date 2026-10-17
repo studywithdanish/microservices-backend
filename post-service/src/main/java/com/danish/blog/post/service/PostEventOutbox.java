@@ -3,6 +3,7 @@ package com.danish.blog.post.service;
 import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.domain.Post;
 import com.danish.blog.post.event.PostPublishedEvent;
+import com.danish.blog.post.observability.OutboxMetrics;
 import com.danish.blog.post.repository.OutboxEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,10 +19,16 @@ public class PostEventOutbox {
 
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
+    private final OutboxMetrics metrics;
 
-    public PostEventOutbox(OutboxEventRepository outboxEventRepository, ObjectMapper objectMapper) {
+    public PostEventOutbox(
+            OutboxEventRepository outboxEventRepository,
+            ObjectMapper objectMapper,
+            OutboxMetrics metrics
+    ) {
         this.outboxEventRepository = outboxEventRepository;
         this.objectMapper = objectMapper;
+        this.metrics = metrics;
     }
 
     public void recordPostPublished(Post post) {
@@ -46,6 +53,7 @@ public class PostEventOutbox {
                     objectMapper.writeValueAsString(event),
                     occurredAt
             ));
+            metrics.recordCreated();
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("Could not serialize PostPublished event", exception);
         }

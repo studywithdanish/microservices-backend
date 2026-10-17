@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.endpoint.web.WebEndpointsSupplier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -30,6 +31,9 @@ class ApiGatewayRoutingTest {
 
     @Autowired
     private WebTestClient webTestClient;
+
+    @Autowired
+    private WebEndpointsSupplier webEndpointsSupplier;
 
     @LocalServerPort
     private int gatewayPort;
@@ -211,6 +215,21 @@ class ApiGatewayRoutingTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("UP");
+    }
+
+    @Test
+    void exposesPrometheusMetricsForInternalScraping() {
+        org.assertj.core.api.Assertions.assertThat(webEndpointsSupplier.getEndpoints())
+                .extracting(endpoint -> endpoint.getEndpointId().toString())
+                .contains("prometheus");
+        webTestClient.get()
+                .uri("/actuator/prometheus")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .value(body -> org.assertj.core.api.Assertions.assertThat(body)
+                        .contains("jvm_memory_used_bytes")
+                        .contains("application=\"api-gateway\""));
     }
 
     @Test

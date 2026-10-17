@@ -34,6 +34,12 @@ class NotificationSecurityAccessTest {
     }
 
     @Test
+    void prometheusMetricsAreAvailableForInternalScraping() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void anonymousNotificationReadIsRejected() throws Exception {
         mockMvc.perform(get("/api/notifications"))
                 .andExpect(status().isUnauthorized());

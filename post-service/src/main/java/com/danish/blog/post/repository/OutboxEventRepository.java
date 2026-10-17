@@ -10,4 +10,8 @@ import java.util.UUID;
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, UUID> {
 
     List<OutboxEvent> findTop50ByPublishedAtIsNullAndNextAttemptAtLessThanEqualOrderByOccurredAtAsc(Instant now);
+
+    long countByPublishedAtIsNull();
+
+    long countByPublishedAtIsNullAndAttemptCountGreaterThan(int attemptCount);
 }

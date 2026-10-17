@@ -4,6 +4,7 @@ import com.danish.blog.notification.api.NotificationDto;
 import com.danish.blog.notification.domain.Notification;
 import com.danish.blog.notification.error.ResourceNotFoundException;
 import com.danish.blog.notification.event.PostPublishedEvent;
+import com.danish.blog.notification.observability.NotificationMetrics;
 import com.danish.blog.notification.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,15 +17,18 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final NotificationMetrics metrics;
 
-    public NotificationService(NotificationRepository notificationRepository) {
+    public NotificationService(NotificationRepository notificationRepository, NotificationMetrics metrics) {
         this.notificationRepository = notificationRepository;
+        this.metrics = metrics;
     }
 
     public void consume(PostPublishedEvent event) {
         validate(event);
         String eventId = event.eventId().toString();
         if (notificationRepository.existsByEventId(eventId)) {
+            metrics.recordDuplicate();
             return;
         }
         notificationRepository.save(new Notification(
@@ -36,6 +40,7 @@ public class NotificationService {
                 "Your post '" + event.title() + "' was published successfully.",
                 event.occurredAt()
         ));
+        metrics.recordNotificationCreated();
     }
 
     @Transactional(readOnly = true)

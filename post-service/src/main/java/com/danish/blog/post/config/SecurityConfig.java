@@ -49,7 +49,7 @@ public class SecurityConfig {
                         .requestMatchers("/internal/**").hasRole("INTERNAL")
                         .requestMatchers(
                                 "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**",
-                                "/actuator/health", "/actuator/info"
+                                "/actuator/health", "/actuator/info", "/actuator/prometheus"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/posts", "/api/posts/search/**", "/api/post/**",

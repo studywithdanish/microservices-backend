@@ -52,4 +52,10 @@ class PostSecurityAccessTest {
                         .header(InternalServiceAuthenticationFilter.INTERNAL_TOKEN_HEADER, INTERNAL_TOKEN))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void prometheusMetricsAreAvailableForInternalScraping() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isOk());
+    }
 }

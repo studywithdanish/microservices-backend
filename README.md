@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, and local Kubernetes deployment are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and observability metrics foundation are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -77,6 +77,7 @@ Completed improvements:
 - Added a dedicated Minikube deployment with persistent MySQL and image storage, generated runtime secrets, health probes, resource limits, and an end-to-end smoke test
 - Added Apache Kafka in KRaft mode, a durable Post Service outbox, a versioned `PostPublished` event, an idempotent Notification Service consumer, retry/DLT handling, and asynchronous smoke-test coverage
 - Added profile-based post-image storage with a local filesystem default and a private Amazon S3 implementation using the AWS SDK credential chain, SSE-S3 encryption, bounded calls, and unchanged public APIs
+- Added Prometheus-format runtime and low-cardinality business metrics across the gateway and all four business services
 
 ## Documentation Map
 
@@ -89,6 +90,7 @@ Completed improvements:
 - [Phase 5 Content extraction](docs/phase-5-content-service.md)
 - [Phase 6 Kafka events](docs/phase-6-kafka-events.md) — outbox, event contract, delivery guarantees, consumer idempotency, and operations
 - [AWS S3 image storage](docs/aws-s3-image-storage.md) — architecture, configuration, security decisions, rollout, rollback, and interview guidance
+- [Observability Phase 1](docs/observability-phase-1.md) — metrics endpoints, business metric catalogue, security boundaries, and verification
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -429,7 +431,7 @@ Important deployment behavior:
 - The production profile uses `spring.jpa.hibernate.ddl-auto=validate`
 - Secrets and environment-specific values are passed through environment variables
 - CORS must be restricted to the deployed frontend URL
-- Actuator exposes only `/actuator/health` and `/actuator/info`
+- The public reverse proxy exposes only `/actuator/health` and `/actuator/info`; internal service ports also expose `/actuator/prometheus`
 - Post images remain on the local volume unless the additional `aws` profile and S3 bucket configuration are supplied
 
 For a frontend deployed at `https://your-domain.com`, use:
@@ -449,11 +451,13 @@ mvn test
 mvn -f identity-service/pom.xml test
 mvn -f post-service/pom.xml test
 mvn -f content-service/pom.xml test
+mvn -f notification-service/pom.xml test
 mvn -f gateway-service/pom.xml test
 mvn dependency:tree
 mvn -f identity-service/pom.xml dependency:tree
 mvn -f post-service/pom.xml dependency:tree
 mvn -f content-service/pom.xml dependency:tree
+mvn -f notification-service/pom.xml dependency:tree
 mvn -f gateway-service/pom.xml dependency:tree
 ```
 
@@ -468,6 +472,7 @@ Security-related improvements already applied:
 - Downstream authorization uses verified JWT identity and role claims
 - Production schema managed by Flyway instead of Hibernate auto-create
 - Health endpoint available for Docker, CI/CD, and AWS checks
+- Prometheus-format JVM, HTTP, database, Kafka, and bounded business metrics on every active service
 
 ## Deployment Roadmap
 
@@ -479,8 +484,8 @@ The S3 application adapter is complete but deliberately inactive in the current 
 2. Deploy the gateway, Identity, Post, Content, Notification, and Kafka topology as the stable AWS baseline.
 3. Store runtime configuration as environment variables or managed configuration and use workload identity for AWS credentials.
 4. Add a Docker image registry push stage in Jenkins.
-5. Add centralized logs and basic metrics.
-6. Add Prometheus and Grafana after the live deployment is stable.
+5. Add centralized logs. The application metrics instrumentation is complete; see `docs/observability-phase-1.md`.
+6. Add Prometheus collection and Grafana dashboards after the live deployment is stable.
 
 The production Docker Compose and AWS runbook are available in:
 

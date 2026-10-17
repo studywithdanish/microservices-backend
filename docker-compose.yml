@@ -116,6 +116,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
       IDENTITY_DB_URL: jdbc:mysql://identity-mysql:3306/${IDENTITY_MYSQL_DATABASE:-blog_identity}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-identity_user}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_password}
@@ -141,6 +142,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
       POST_DB_URL: jdbc:mysql://post-mysql:3306/${POST_MYSQL_DATABASE:-blog_posts}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       POST_DB_USERNAME: ${POST_DB_USERNAME:-post_user}
       POST_DB_PASSWORD: ${POST_DB_PASSWORD:-post_password}
@@ -167,6 +169,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
       CONTENT_DB_URL: jdbc:mysql://content-mysql:3306/${CONTENT_MYSQL_DATABASE:-blog_content}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       CONTENT_DB_USERNAME: ${CONTENT_DB_USERNAME:-content_user}
       CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:-content_password}
@@ -192,6 +195,7 @@ services:
         condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
       NOTIFICATION_DB_URL: jdbc:mysql://notification-mysql:3306/${NOTIFICATION_MYSQL_DATABASE:-blog_notifications}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-notification_user}
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_password}
@@ -220,6 +224,7 @@ services:
       notification-service:
         condition: service_healthy
     environment:
+      METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
       IDENTITY_BASE_URL: http://identity-service:9092
       POST_SERVICE_BASE_URL: http://post-service:9093
       CONTENT_SERVICE_BASE_URL: http://content-service:9094

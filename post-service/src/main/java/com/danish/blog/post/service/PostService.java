@@ -10,6 +10,7 @@ import com.danish.blog.post.client.CategoryClient;
 import com.danish.blog.post.domain.Post;
 import com.danish.blog.post.error.ApiException;
 import com.danish.blog.post.error.ResourceNotFoundException;
+import com.danish.blog.post.observability.PostMetrics;
 import com.danish.blog.post.repository.PostRepository;
 import com.danish.blog.post.security.JwtPrincipal;
 import org.springframework.data.domain.Page;
@@ -39,15 +40,18 @@ public class PostService {
     private final PostRepository postRepository;
     private final CategoryClient categoryClient;
     private final PostEventOutbox postEventOutbox;
+    private final PostMetrics metrics;
 
     public PostService(
             PostRepository postRepository,
             CategoryClient categoryClient,
-            PostEventOutbox postEventOutbox
+            PostEventOutbox postEventOutbox,
+            PostMetrics metrics
     ) {
         this.postRepository = postRepository;
         this.categoryClient = categoryClient;
         this.postEventOutbox = postEventOutbox;
+        this.metrics = metrics;
     }
 
     public PostDto create(PostCreateRequest request, Integer authorId) {
@@ -67,6 +71,7 @@ public class PostService {
         post.setAddedDate(new Date());
         Post saved = postRepository.save(post);
         postEventOutbox.recordPostPublished(saved);
+        metrics.recordPostCreated();
         return toDto(saved);
     }
 

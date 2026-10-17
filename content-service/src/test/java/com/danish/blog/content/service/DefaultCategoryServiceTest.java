@@ -4,6 +4,7 @@ import com.danish.blog.content.api.CategoryDto;
 import com.danish.blog.content.api.CategoryRequest;
 import com.danish.blog.content.domain.Category;
 import com.danish.blog.content.error.ResourceNotFoundException;
+import com.danish.blog.content.observability.ContentMetrics;
 import com.danish.blog.content.repository.CategoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,11 +28,14 @@ class DefaultCategoryServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ContentMetrics metrics;
+
     private DefaultCategoryService categoryService;
 
     @BeforeEach
     void setUp() {
-        categoryService = new DefaultCategoryService(categoryRepository);
+        categoryService = new DefaultCategoryService(categoryRepository, metrics);
     }
 
     @Test

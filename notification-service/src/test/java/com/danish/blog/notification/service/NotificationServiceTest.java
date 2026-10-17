@@ -2,6 +2,7 @@ package com.danish.blog.notification.service;
 
 import com.danish.blog.notification.domain.Notification;
 import com.danish.blog.notification.event.PostPublishedEvent;
+import com.danish.blog.notification.observability.NotificationMetrics;
 import com.danish.blog.notification.repository.NotificationRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,11 +26,14 @@ class NotificationServiceTest {
     @Mock
     private NotificationRepository notificationRepository;
 
+    @Mock
+    private NotificationMetrics metrics;
+
     private NotificationService notificationService;
 
     @BeforeEach
     void setUp() {
-        notificationService = new NotificationService(notificationRepository);
+        notificationService = new NotificationService(notificationRepository, metrics);
     }
 
     @Test
