@@ -30,6 +30,7 @@ flowchart LR
         Prometheus -.->|scrape internal metrics| Post
         Prometheus -.->|scrape internal metrics| Content
         Prometheus -.->|scrape internal metrics| Notification
+        Grafana[Grafana<br/>operator dashboards] -->|PromQL| Prometheus
     end
 ```
 
@@ -110,7 +111,9 @@ sequenceDiagram
 - Recording rules precompute request rate, HTTP 5xx ratio, p95 latency, and outbox backlog queries.
 - Alert rules detect service scrape failure, elevated errors or latency, event publication failures, dead-letter events, and Prometheus rule failures.
 - Prometheus is available on port `9096` for local development, loopback-only through an SSH tunnel in production Compose, and through a temporary port-forward in Kubernetes.
-- Grafana visualization is intentionally the next phase; Prometheus collection and queries are validated first.
+- Grafana is provisioned from Git with platform overview, Kafka/outbox, and per-service JVM/database dashboards.
+- Grafana is available on port `3001` for local development and only through an SSH tunnel or Kubernetes port-forward in production-style environments.
+- Metrics identify the failing component and time window; later centralized-log and trace phases provide detailed request evidence.
 
 ## Migration Strategy
 

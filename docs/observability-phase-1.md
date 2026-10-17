@@ -61,4 +61,4 @@ Automated tests verify endpoint access and the values and tag sets of the custom
 
 ## Next phase
 
-Phase 2 now runs Prometheus as a collector, configures internal service scrape targets, persists time-series data, and evaluates recording and alerting rules. See [Observability Phase 2](observability-phase-2.md). Grafana dashboards remain the next phase now that collection is reliable.
+Phase 2 runs Prometheus as a collector, configures internal service scrape targets, persists time-series data, and evaluates recording and alerting rules. See [Observability Phase 2](observability-phase-2.md). Phase 3 adds provisioned operator dashboards on top of that data; see [Observability Phase 3](observability-phase-3.md).

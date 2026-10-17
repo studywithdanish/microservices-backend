@@ -9,11 +9,21 @@ resources:
   - applications.yaml
   - frontend.yaml
   - prometheus.yaml
+  - grafana.yaml
 configMapGenerator:
   - name: prometheus-config
     files:
       - prometheus/prometheus.yml
       - prometheus/blog-platform.yml
+  - name: grafana-provisioning
+    files:
+      - prometheus.yml=grafana/provisioning/datasources/prometheus.yml
+      - dashboards.yml=grafana/provisioning/dashboards/dashboards.yml
+  - name: grafana-dashboards
+    files:
+      - grafana/dashboards/platform-overview.json
+      - grafana/dashboards/event-pipeline.json
+      - grafana/dashboards/service-detail.json
 labels:
   - includeSelectors: true
     pairs:

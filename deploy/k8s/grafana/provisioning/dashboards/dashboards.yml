@@ -1,0 +1,15 @@
+apiVersion: 1
+
+providers:
+  - name: Blog Platform
+    orgId: 1
+    folder: Blog Platform
+    folderUid: blog-platform
+    type: file
+    disableDeletion: true
+    editable: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false
