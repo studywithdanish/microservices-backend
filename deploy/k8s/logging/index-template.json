@@ -1,0 +1,72 @@
+{
+  "index_patterns": [
+    "blog-platform-logs-*"
+  ],
+  "priority": 500,
+  "version": 1,
+  "_meta": {
+    "description": "Mappings and lifecycle settings for Blog Platform ECS application logs"
+  },
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "blog-platform-logs-14-days",
+      "index.number_of_shards": 1,
+      "index.number_of_replicas": 0,
+      "index.mapping.total_fields.limit": 1500
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "message": {
+          "type": "match_only_text"
+        },
+        "service": {
+          "properties": {
+            "name": {
+              "type": "keyword"
+            },
+            "environment": {
+              "type": "keyword"
+            },
+            "version": {
+              "type": "keyword"
+            }
+          }
+        },
+        "log": {
+          "properties": {
+            "level": {
+              "type": "keyword"
+            },
+            "logger": {
+              "type": "keyword",
+              "ignore_above": 512
+            }
+          }
+        },
+        "event": {
+          "properties": {
+            "dataset": {
+              "type": "keyword"
+            }
+          }
+        },
+        "correlationId": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "trace.id": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "transaction.id": {
+          "type": "keyword",
+          "ignore_above": 256
+        }
+      }
+    }
+  }
+}

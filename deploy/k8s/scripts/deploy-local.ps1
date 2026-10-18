@@ -94,11 +94,17 @@ foreach ($database in @('identity-mysql', 'post-mysql', 'content-mysql', 'notifi
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "statefulset/$database", '--timeout=300s')
 }
 
+Invoke-Checked kubectl @('-n', $namespace, 'delete', 'job', 'logging-setup', '--ignore-not-found=true', '--wait=true')
 Invoke-Checked kubectl @('apply', '-k', $k8sRoot)
 
-foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'mailpit', 'alertmanager', 'prometheus', 'grafana')) {
+Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', 'statefulset/elasticsearch', '--timeout=300s')
+
+foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'mailpit', 'alertmanager', 'prometheus', 'grafana', 'kibana')) {
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "deployment/$deployment", '--timeout=300s')
 }
+
+Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', 'daemonset/filebeat', '--timeout=300s')
+Invoke-Checked kubectl @('-n', $namespace, 'wait', '--for=condition=complete', 'job/logging-setup', '--timeout=300s')
 
 $minikubeIp = (& minikube -p $Profile ip).Trim()
 Write-Host ''
@@ -109,3 +115,5 @@ Write-Host 'Grafana access: kubectl -n blog-platform port-forward service/grafan
 Write-Host 'Grafana password (PowerShell): $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.GRAFANA_ADMIN_PASSWORD}"; [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))'
 Write-Host 'Alertmanager access: kubectl -n blog-platform port-forward service/alertmanager 19093:9093'
 Write-Host 'Local alert inbox: kubectl -n blog-platform port-forward service/mailpit 18025:8025'
+Write-Host 'Kibana access: kubectl -n blog-platform port-forward service/kibana 15601:5601'
+Write-Host 'Elasticsearch diagnostics: kubectl -n blog-platform port-forward service/elasticsearch 19200:9200'

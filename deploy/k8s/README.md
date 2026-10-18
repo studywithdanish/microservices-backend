@@ -1,6 +1,6 @@
 # Local Kubernetes Runbook
 
-This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Grafana, Alertmanager, and local Mailpit inbox remain cluster-internal.
+This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, and local Mailpit inbox remain cluster-internal.
 
 ## Prerequisites
 
@@ -8,14 +8,14 @@ This directory deploys the complete platform to a dedicated local Minikube profi
 - `kubectl`
 - Minikube
 - PowerShell 7+
-- At least 6 GiB available to the Minikube profile
+- At least 8 GiB available to the Minikube profile
 
 The default profile name is `blog-platform`. A dedicated profile avoids overwriting or resizing an existing Minikube environment.
 
 ## Create the cluster
 
 ```powershell
-minikube start -p blog-platform --driver=docker --memory=6144 --cpus=4
+minikube start -p blog-platform --driver=docker --memory=8192 --cpus=4
 ```
 
 Minikube makes `blog-platform` the current `kubectl` context. Confirm it before deployment:
@@ -37,7 +37,7 @@ The script performs these steps:
 1. Builds the five active Spring Boot service images and the React/Nginx image.
 2. Loads all images into the selected Minikube profile.
 3. Generates a Kubernetes Secret only when one does not already exist.
-4. Deploys four MySQL StatefulSets, one Kafka StatefulSet, Prometheus, Grafana, Alertmanager, and Mailpit with persistent volumes.
+4. Deploys four MySQL StatefulSets, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, and Mailpit with persistent state where required.
 5. Waits for the databases and Kafka before deploying the services, gateway, and frontend.
 6. Waits until every application Deployment is available.
 
@@ -101,6 +101,19 @@ Open `http://localhost:19093` for alerts/silences and `http://localhost:18025` f
   -MailpitUrl http://localhost:18025
 ```
 
+To investigate centralized application logs, start two additional port-forwards:
+
+```powershell
+kubectl -n blog-platform port-forward service/kibana 15601:5601
+kubectl -n blog-platform port-forward service/elasticsearch 19200:9200
+```
+
+Open `http://localhost:15601`, select **Discover**, and choose **Blog Platform Logs**. Validate recent gateway collection with:
+
+```powershell
+.\deploy\k8s\scripts\test-centralized-logging.ps1
+```
+
 Useful diagnostics:
 
 ```powershell
@@ -114,6 +127,10 @@ kubectl -n blog-platform logs deployment/prometheus
 kubectl -n blog-platform logs deployment/grafana
 kubectl -n blog-platform logs deployment/alertmanager
 kubectl -n blog-platform logs deployment/mailpit
+kubectl -n blog-platform logs statefulset/elasticsearch
+kubectl -n blog-platform logs deployment/kibana
+kubectl -n blog-platform logs daemonset/filebeat
+kubectl -n blog-platform logs job/logging-setup
 kubectl -n blog-platform logs statefulset/kafka
 ```
 

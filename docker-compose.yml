@@ -117,6 +117,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
       IDENTITY_DB_URL: jdbc:mysql://identity-mysql:3306/${IDENTITY_MYSQL_DATABASE:-blog_identity}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       IDENTITY_DB_USERNAME: ${IDENTITY_DB_USERNAME:-identity_user}
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:-identity_password}
@@ -128,6 +131,8 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     expose:
       - "9092"
+    labels:
+      co.elastic.logs/enabled: "true"
     restart: unless-stopped
 
   post-service:
@@ -143,6 +148,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
       POST_DB_URL: jdbc:mysql://post-mysql:3306/${POST_MYSQL_DATABASE:-blog_posts}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       POST_DB_USERNAME: ${POST_DB_USERNAME:-post_user}
       POST_DB_PASSWORD: ${POST_DB_PASSWORD:-post_password}
@@ -157,6 +165,8 @@ services:
       - "9093"
     volumes:
       - uploaded_images:/app/images
+    labels:
+      co.elastic.logs/enabled: "true"
     restart: unless-stopped
 
   content-service:
@@ -170,6 +180,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
       CONTENT_DB_URL: jdbc:mysql://content-mysql:3306/${CONTENT_MYSQL_DATABASE:-blog_content}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       CONTENT_DB_USERNAME: ${CONTENT_DB_USERNAME:-content_user}
       CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD:-content_password}
@@ -181,6 +194,8 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     expose:
       - "9094"
+    labels:
+      co.elastic.logs/enabled: "true"
     restart: unless-stopped
 
   notification-service:
@@ -196,6 +211,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
       NOTIFICATION_DB_URL: jdbc:mysql://notification-mysql:3306/${NOTIFICATION_MYSQL_DATABASE:-blog_notifications}?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
       NOTIFICATION_DB_USERNAME: ${NOTIFICATION_DB_USERNAME:-notification_user}
       NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:-notification_password}
@@ -207,6 +225,8 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     expose:
       - "9095"
+    labels:
+      co.elastic.logs/enabled: "true"
     restart: unless-stopped
 
   gateway:
@@ -225,6 +245,9 @@ services:
         condition: service_healthy
     environment:
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+      LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
+      LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
       IDENTITY_BASE_URL: http://identity-service:9092
       POST_SERVICE_BASE_URL: http://post-service:9093
       CONTENT_SERVICE_BASE_URL: http://content-service:9094
@@ -237,6 +260,8 @@ services:
       default:
         aliases:
           - api-gateway
+    labels:
+      co.elastic.logs/enabled: "true"
     restart: unless-stopped
 
   mailpit:
@@ -339,6 +364,76 @@ services:
       retries: 10
     restart: unless-stopped
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1
+    container_name: blog-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.ml.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.1
+    container_name: blog-kibana
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      SERVER_NAME: blog-platform-kibana
+      TELEMETRY_OPTIN: "false"
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:5601/api/status >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+    restart: unless-stopped
+
+  logging-setup:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.1
+    container_name: blog-logging-setup
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+    command: ["/bin/bash", "/usr/share/blog-platform/logging/setup-logging.sh"]
+    environment:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      KIBANA_URL: http://kibana:5601
+    volumes:
+      - ./deploy/k8s/logging:/usr/share/blog-platform/logging:ro
+    restart: "no"
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:9.3.1
+    container_name: blog-filebeat
+    user: root
+    depends_on:
+      logging-setup:
+        condition: service_completed_successfully
+    command: ["filebeat", "-e", "-c", "/usr/share/filebeat/filebeat.yml", "--strict.perms=false"]
+    volumes:
+      - ./deploy/k8s/logging/filebeat.docker.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - filebeat_data:/usr/share/filebeat/data
+    restart: unless-stopped
+
 volumes:
   identity_mysql_data:
   post_mysql_data:
@@ -350,3 +445,5 @@ volumes:
   grafana_data:
   alertmanager_data:
   mailpit_data:
+  elasticsearch_data:
+  filebeat_data:

@@ -1,0 +1,47 @@
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      host: unix:///var/run/docker.sock
+      hints.enabled: true
+      hints.default_config:
+        enabled: false
+        type: filestream
+        id: container-${data.container.id}
+        prospector.scanner.symlinks: true
+        parsers:
+          - container:
+              stream: all
+              format: docker
+        paths:
+          - /var/lib/docker/containers/${data.container.id}/*.log
+
+processors:
+  - decode_json_fields:
+      fields: [message]
+      target: ""
+      overwrite_keys: true
+      add_error_key: true
+      when.regexp.message: '^\s*\{'
+  - add_fields:
+      target: event
+      fields:
+        dataset: blog-platform.application
+  - add_host_metadata: ~
+  - add_docker_metadata:
+      host: unix:///var/run/docker.sock
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "blog-platform-logs-%{+yyyy.MM.dd}"
+  bulk_max_size: 512
+
+setup.template.enabled: false
+setup.ilm.enabled: false
+
+queue.mem:
+  events: 2048
+  flush.min_events: 256
+  flush.timeout: 5s
+
+logging.level: info
+logging.to_files: false

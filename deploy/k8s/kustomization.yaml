@@ -11,6 +11,7 @@ resources:
   - prometheus.yaml
   - grafana.yaml
   - alertmanager.yaml
+  - logging.yaml
 configMapGenerator:
   - name: prometheus-config
     files:
@@ -29,6 +30,12 @@ configMapGenerator:
     files:
       - alertmanager.yml=alertmanager/alertmanager.yml
       - blog-platform.tmpl=alertmanager/blog-platform.tmpl
+  - name: logging-config
+    files:
+      - filebeat.kubernetes.yml=logging/filebeat.kubernetes.yml
+      - setup-logging.sh=logging/setup-logging.sh
+      - ilm-policy.json=logging/ilm-policy.json
+      - index-template.json=logging/index-template.json
 labels:
   - includeSelectors: true
     pairs:

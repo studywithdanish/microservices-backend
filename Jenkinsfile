@@ -17,6 +17,7 @@ pipeline {
         NOTIFICATION_IMAGE_NAME = 'blog-notification-service'
         PROMETHEUS_IMAGE = 'prom/prometheus:v3.15.0'
         ALERTMANAGER_IMAGE = 'prom/alertmanager:v0.34.1'
+        FILEBEAT_IMAGE = 'docker.elastic.co/beats/filebeat:9.3.1'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -122,6 +123,7 @@ pipeline {
                     runCommand('kubectl kustomize deploy/k8s')
                     validatePrometheusConfiguration()
                     validateAlertmanagerConfiguration()
+                    validateCentralizedLoggingConfiguration()
                 }
             }
         }
@@ -188,4 +190,13 @@ void validateAlertmanagerConfiguration() {
 
     runCommand("docker run --rm --entrypoint amtool -v \"${configDirectory}:/etc/alertmanager:ro\" ${env.ALERTMANAGER_IMAGE} check-config /etc/alertmanager/alertmanager.yml")
     runCommand("docker run --rm --entrypoint amtool -v \"${configDirectory}:/etc/alertmanager:ro\" ${env.ALERTMANAGER_IMAGE} check-config /etc/alertmanager/alertmanager.production.example.yml")
+}
+
+void validateCentralizedLoggingConfiguration() {
+    String configDirectory = isUnix()
+            ? "${env.WORKSPACE}/deploy/k8s/logging"
+            : "${env.WORKSPACE}\\deploy\\k8s\\logging"
+
+    runCommand("docker run --rm -e NODE_NAME=ci-node -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 -v \"${configDirectory}:/usr/share/filebeat/config:ro\" ${env.FILEBEAT_IMAGE} filebeat test config -c /usr/share/filebeat/config/filebeat.docker.yml -e --strict.perms=false")
+    runCommand("docker run --rm -e NODE_NAME=ci-node -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 -v \"${configDirectory}:/usr/share/filebeat/config:ro\" ${env.FILEBEAT_IMAGE} filebeat test config -c /usr/share/filebeat/config/filebeat.kubernetes.yml -e --strict.perms=false")
 }
