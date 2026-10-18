@@ -212,6 +212,31 @@
       ],
       "title": "Database Connection Pools",
       "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "mappings": [{ "options": { "0": { "color": "red", "index": 1, "text": "DOWN" }, "1": { "color": "green", "index": 0, "text": "UP" } }, "type": "value" }], "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 29 },
+      "id": 11,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "targets": [
+        { "editorMode": "code", "expr": "max(up{job=\"monitoring\", component=\"alertmanager\"})", "instant": false, "legendFormat": "Alertmanager", "range": true, "refId": "A" }
+      ],
+      "title": "Alertmanager Health",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "gradientMode": "none", "hideFrom": { "legend": false, "tooltip": false, "viz": false }, "lineInterpolation": "smooth", "lineWidth": 2, "pointSize": 5, "scaleDistribution": { "type": "linear" }, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" }, "thresholdsStyle": { "mode": "line" } }, "mappings": [], "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 0.01 }] }, "unit": "ops" }, "overrides": [] },
+      "gridPos": { "h": 6, "w": 18, "x": 6, "y": 29 },
+      "id": 12,
+      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "hideZeros": false, "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "editorMode": "code", "expr": "sum by (integration) (rate(alertmanager_notifications_total[5m]))", "legendFormat": "{{integration}} delivered", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "sum by (integration) (rate(alertmanager_notifications_failed_total[5m]))", "legendFormat": "{{integration}} failed", "range": true, "refId": "B" }
+      ],
+      "title": "Alert Notification Delivery",
+      "type": "timeseries"
     }
   ],
   "refresh": "30s",
@@ -223,6 +248,6 @@
   "timezone": "browser",
   "title": "Blog Platform - Overview",
   "uid": "blog-platform-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

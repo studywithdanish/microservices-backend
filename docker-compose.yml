@@ -239,11 +239,58 @@ services:
           - api-gateway
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:v1.31.5
+    container_name: blog-mailpit
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 500
+      MP_DISABLE_VERSION_CHECK: "true"
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    expose:
+      - "1025"
+    volumes:
+      - mailpit_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:8025/livez || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    container_name: blog-alertmanager
+    depends_on:
+      mailpit:
+        condition: service_healthy
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --web.enable-lifecycle
+      - --cluster.listen-address=
+      - --enable-feature=utf8-strict-mode
+    ports:
+      - "${ALERTMANAGER_PORT:-9097}:9093"
+    volumes:
+      - ./deploy/k8s/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./deploy/k8s/alertmanager/blog-platform.tmpl:/etc/alertmanager/templates/blog-platform.tmpl:ro
+      - alertmanager_data:/alertmanager
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://localhost:9093/-/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   prometheus:
     image: prom/prometheus:v3.15.0
     container_name: blog-prometheus
     depends_on:
       gateway:
+        condition: service_healthy
+      alertmanager:
         condition: service_healthy
     command:
       - --config.file=/etc/prometheus/prometheus.yml
@@ -301,3 +348,5 @@ volumes:
   uploaded_images:
   prometheus_data:
   grafana_data:
+  alertmanager_data:
+  mailpit_data:

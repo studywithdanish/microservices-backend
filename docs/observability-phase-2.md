@@ -96,7 +96,7 @@ sum by (application, outcome) (rate(blog_kafka_post_published_events_total[5m]))
 
 ## Alert rules and first-response runbook
 
-Phase 2 evaluates alerts inside Prometheus. Sending notifications to email, Slack, or PagerDuty belongs to the later Alertmanager phase.
+Phase 2 evaluates alerts inside Prometheus. Phase 4 now sends them through Alertmanager with grouping, inhibition, silences, and severity-based email routing; see [Observability Phase 4](observability-phase-4.md).
 
 ### Service down
 
@@ -163,4 +163,4 @@ docker run --rm --entrypoint promtool `
 
 ## Phase boundary
 
-This phase collects, stores, queries, and evaluates metrics. Phase 3 now provisions Grafana and interview-ready service, JVM, Kafka, and business dashboards; see [Observability Phase 3](observability-phase-3.md). Alertmanager routing and centralized logs remain later phases.
+This phase collects, stores, queries, and evaluates metrics. Phase 3 provisions Grafana and interview-ready service, JVM, Kafka, and business dashboards; see [Observability Phase 3](observability-phase-3.md). Phase 4 adds Alertmanager routing; see [Observability Phase 4](observability-phase-4.md). Centralized logs remain the next major phase.

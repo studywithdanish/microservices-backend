@@ -10,6 +10,7 @@ resources:
   - frontend.yaml
   - prometheus.yaml
   - grafana.yaml
+  - alertmanager.yaml
 configMapGenerator:
   - name: prometheus-config
     files:
@@ -24,6 +25,10 @@ configMapGenerator:
       - grafana/dashboards/platform-overview.json
       - grafana/dashboards/event-pipeline.json
       - grafana/dashboards/service-detail.json
+  - name: alertmanager-config
+    files:
+      - alertmanager.yml=alertmanager/alertmanager.yml
+      - blog-platform.tmpl=alertmanager/blog-platform.tmpl
 labels:
   - includeSelectors: true
     pairs:

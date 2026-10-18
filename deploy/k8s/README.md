@@ -1,6 +1,6 @@
 # Local Kubernetes Runbook
 
-This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, and Grafana services remain cluster-internal.
+This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Grafana, Alertmanager, and local Mailpit inbox remain cluster-internal.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ The script performs these steps:
 1. Builds the five active Spring Boot service images and the React/Nginx image.
 2. Loads all images into the selected Minikube profile.
 3. Generates a Kubernetes Secret only when one does not already exist.
-4. Deploys four MySQL StatefulSets, one Kafka StatefulSet, Prometheus, and Grafana with persistent volumes.
+4. Deploys four MySQL StatefulSets, one Kafka StatefulSet, Prometheus, Grafana, Alertmanager, and Mailpit with persistent volumes.
 5. Waits for the databases and Kafka before deploying the services, gateway, and frontend.
 6. Waits until every application Deployment is available.
 
@@ -86,6 +86,21 @@ $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.
 
 Sign in with user `admin`. The **Blog Platform** folder contains the overview, event-pipeline, and service-detail dashboards.
 
+To inspect Alertmanager and the local email inbox, start two more port-forwards:
+
+```powershell
+kubectl -n blog-platform port-forward service/alertmanager 19093:9093
+kubectl -n blog-platform port-forward service/mailpit 18025:8025
+```
+
+Open `http://localhost:19093` for alerts/silences and `http://localhost:18025` for routed emails. With both forwards active, verify critical routing from another terminal:
+
+```powershell
+.\deploy\k8s\scripts\test-alert-routing.ps1 `
+  -AlertmanagerUrl http://localhost:19093 `
+  -MailpitUrl http://localhost:18025
+```
+
 Useful diagnostics:
 
 ```powershell
@@ -97,6 +112,8 @@ kubectl -n blog-platform logs deployment/content-service
 kubectl -n blog-platform logs deployment/notification-service
 kubectl -n blog-platform logs deployment/prometheus
 kubectl -n blog-platform logs deployment/grafana
+kubectl -n blog-platform logs deployment/alertmanager
+kubectl -n blog-platform logs deployment/mailpit
 kubectl -n blog-platform logs statefulset/kafka
 ```
 
