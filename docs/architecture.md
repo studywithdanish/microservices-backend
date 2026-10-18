@@ -33,6 +33,13 @@ flowchart LR
         Grafana[Grafana<br/>operator dashboards] -->|PromQL| Prometheus
         Prometheus -->|firing/resolved alerts| Alertmanager[Alertmanager<br/>routing and silences]
         Alertmanager -->|local SMTP| Mailpit[Mailpit<br/>operator inbox]
+        Gateway -.->|ECS JSON stdout| Filebeat[Filebeat]
+        Identity -.->|ECS JSON stdout| Filebeat
+        Post -.->|ECS JSON stdout| Filebeat
+        Content -.->|ECS JSON stdout| Filebeat
+        Notification -.->|ECS JSON stdout| Filebeat
+        Filebeat -->|daily indices| Elasticsearch[(Elasticsearch<br/>14-day logs)]
+        Kibana[Kibana<br/>Discover] -->|search and filter| Elasticsearch
     end
 ```
 
@@ -118,7 +125,11 @@ sequenceDiagram
 - Alertmanager groups, deduplicates, inhibits, silences, and routes Prometheus alerts by severity. Critical notifications repeat more frequently than warnings.
 - Mailpit captures local email delivery for deterministic testing; production uses an authenticated external SMTP relay with its password mounted from a secret file.
 - Alertmanager is available on port `9097` for local development and only through an SSH tunnel or Kubernetes port-forward in production-style environments.
-- Metrics identify the failing component and time window; later centralized-log and trace phases provide detailed request evidence.
+- Every active Spring Boot service emits Elastic Common Schema JSON to standard output in deployed environments.
+- Filebeat collects only explicitly opted-in application containers/pods and writes daily `blog-platform-logs-*` indices.
+- Elasticsearch applies a 14-day deletion lifecycle; Kibana provisions the **Blog Platform Logs** data view for service, severity, message, container, and pod searches.
+- Elasticsearch and Kibana are available on ports `9200` and `5601` locally and only through SSH tunnels or Kubernetes port-forwards in production-style environments.
+- Metrics identify the failing component and time window; centralized logs provide exception evidence, while later correlation and trace phases connect a complete request journey.
 
 ## Migration Strategy
 

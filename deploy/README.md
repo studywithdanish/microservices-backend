@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, Grafana, Alertmanager, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -24,6 +24,7 @@ PostPublished          -> Post Service -> Kafka -> Notification Service
 internal metrics      -> Prometheus -> persistent 15-day time series
 operator dashboards   -> Grafana -> Prometheus queries
 evaluated alerts      -> Alertmanager -> external SMTP -> operators
+structured stdout     -> Filebeat -> Elasticsearch -> Kibana Discover
 /actuator/health      -> API Gateway health endpoint
 /actuator/info        -> API Gateway application information
 ```
@@ -193,6 +194,14 @@ ssh -L 19093:127.0.0.1:9097 user@your-server
 
 Open `http://localhost:19093`. Do not open port `9097` in the cloud firewall.
 
+Elasticsearch and Kibana are loopback-only as well. Open tunnels only when investigating logs:
+
+```bash
+ssh -L 19200:127.0.0.1:9200 -L 15601:127.0.0.1:5601 user@your-server
+```
+
+Open `http://localhost:15601`, select **Discover**, and choose **Blog Platform Logs**. Do not open ports `9200` or `5601` in the cloud firewall. The supplied single-node topology disables Elastic authentication and therefore depends on loopback binding, host access control, and the authenticated SSH tunnel. Use Elastic Cloud or TLS and role-based authentication for a real multi-user environment.
+
 ## 6. Verify
 
 Use these URLs:
@@ -257,7 +266,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists time-series data, and evaluates latency, error, availability, outbox, and dead-letter alerts. Grafana is provisioned from Git with platform, event-pipeline, and per-service dashboards. Alertmanager groups, deduplicates, inhibits, and routes alerts to operators through authenticated SMTP. All three operator interfaces are available only through SSH tunnels. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables or mounted secret files. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, Grafana, Alertmanager, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
+I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists time-series data, and evaluates latency, error, availability, outbox, and dead-letter alerts. Grafana is provisioned from Git with platform, event-pipeline, and per-service dashboards. Alertmanager groups, deduplicates, inhibits, and routes alerts to operators through authenticated SMTP. Spring Boot emits ECS JSON logs, Filebeat ships only opted-in application workloads, Elasticsearch applies 14-day retention, and Kibana provides centralized investigation. Operator interfaces are available only through SSH tunnels. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables or mounted secret files. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Filebeat, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 
