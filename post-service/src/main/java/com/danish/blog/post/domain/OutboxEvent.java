@@ -32,6 +32,9 @@ public class OutboxEvent {
     @Column(nullable = false, columnDefinition = "text")
     private String payload;
 
+    @Column(name = "correlation_id", nullable = false, length = 128)
+    private String correlationId;
+
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
@@ -56,6 +59,7 @@ public class OutboxEvent {
             Integer aggregateId,
             String eventType,
             String payload,
+            String correlationId,
             Instant occurredAt
     ) {
         this.eventId = eventId;
@@ -63,6 +67,7 @@ public class OutboxEvent {
         this.aggregateId = aggregateId;
         this.eventType = eventType;
         this.payload = payload;
+        this.correlationId = correlationId;
         this.occurredAt = occurredAt;
         this.nextAttemptAt = occurredAt;
     }
@@ -73,9 +78,18 @@ public class OutboxEvent {
             Integer aggregateId,
             String eventType,
             String payload,
+            String correlationId,
             Instant occurredAt
     ) {
-        return new OutboxEvent(eventId, aggregateType, aggregateId, eventType, payload, occurredAt);
+        return new OutboxEvent(
+                eventId,
+                aggregateType,
+                aggregateId,
+                eventType,
+                payload,
+                correlationId,
+                occurredAt
+        );
     }
 
     public void markPublished(Instant publishedAt) {
@@ -100,6 +114,10 @@ public class OutboxEvent {
 
     public String getPayload() {
         return payload;
+    }
+
+    public String getCorrelationId() {
+        return correlationId;
     }
 
     public Instant getOccurredAt() {

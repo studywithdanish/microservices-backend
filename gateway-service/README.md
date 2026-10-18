@@ -10,7 +10,7 @@ The API Gateway is the public entry point for the blogging platform. Phase 5 com
 - Reject unknown and private routes instead of forwarding them to a catch-all backend
 - Translate the browser's authentication cookie into an internal bearer header and remove the raw cookie
 - Preserve explicit `Authorization` and other request headers for non-browser clients
-- Create or validate an `X-Correlation-Id` for every routed request
+- Create or validate an `X-Correlation-Id` for every routed request, carry it through Reactor Context/MDC, and return it to the client
 - Apply browser CORS policy at the public boundary
 - Return a stable JSON response when a downstream service is unavailable or times out
 - Expose gateway health and info endpoints
@@ -51,4 +51,4 @@ Configuration variables:
 mvn test
 ```
 
-The tests verify identity/post/content route separation, secure cookie translation and removal, bearer-token forwarding, correlation IDs, gateway health, unavailable-service responses, timeout responses, and rejection of unconfigured routes.
+The tests verify identity/post/content route separation, secure cookie translation and removal, bearer-token forwarding, correlation IDs across reactive thread switches, gateway health, unavailable-service responses, timeout responses, and rejection of unconfigured routes.

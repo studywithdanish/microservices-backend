@@ -105,7 +105,7 @@ sequenceDiagram
 
 - Gateway connection and response timeouts prevent unbounded waits.
 - Gateway failures use consistent JSON `503` or `504` responses.
-- Correlation IDs are validated or generated at the gateway and returned to clients.
+- Correlation IDs are validated or generated at every HTTP boundary, returned to clients, forwarded by private HTTP calls, persisted with outbox events, and carried in Kafka headers.
 - Post creation fails safely when category validation is unavailable.
 - Comment creation fails safely when Post reference validation is unavailable.
 - Every service and database has an independent health check.
@@ -129,7 +129,16 @@ sequenceDiagram
 - Filebeat collects only explicitly opted-in application containers/pods and writes daily `blog-platform-logs-*` indices.
 - Elasticsearch applies a 14-day deletion lifecycle; Kibana provisions the **Blog Platform Logs** data view for service, severity, message, container, and pod searches.
 - Elasticsearch and Kibana are available on ports `9200` and `5601` locally and only through SSH tunnels or Kubernetes port-forwards in production-style environments.
-- Metrics identify the failing component and time window; centralized logs provide exception evidence, while later correlation and trace phases connect a complete request journey.
+- Metrics identify the failing component and time window; centralized logs provide exception evidence; correlation IDs connect the complete synchronous and asynchronous request journey. Distributed traces are the next deeper latency view.
+
+## Correlation workflow
+
+- The gateway puts `X-Correlation-Id` in Reactor Context and MDC, including after reactive thread switches.
+- Identity, Post, Content, and Notification use request filters that set and always clear the same MDC field.
+- Post-to-Content and Content-to-Post private calls forward the header.
+- Post persists the ID in its transactional outbox because Kafka publication happens after the request thread ends.
+- Notification restores the Kafka header to MDC while consuming, or generates a safe fallback for legacy records.
+- ECS JSON exposes `correlationId` as a keyword field, so one Kibana query reconstructs the journey across services.
 
 ## Migration Strategy
 

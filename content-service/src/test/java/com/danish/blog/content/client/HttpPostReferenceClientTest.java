@@ -1,8 +1,11 @@
 package com.danish.blog.content.client;
 
 import com.danish.blog.content.error.DownstreamServiceException;
+import com.danish.blog.content.observability.CorrelationIdFilter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -30,11 +33,18 @@ class HttpPostReferenceClientTest {
         client = new HttpPostReferenceClient(builder, "http://post-service:9093", "internal-token");
     }
 
+    @AfterEach
+    void clearMdc() {
+        MDC.clear();
+    }
+
     @Test
     void returnsTrueAndSendsInternalCredential() {
+        MDC.put(CorrelationIdFilter.MDC_KEY, "request-comment-123");
         server.expect(once(), requestTo("http://post-service:9093/internal/posts/10/reference"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("X-Internal-Service-Token", "internal-token"))
+                .andExpect(header(CorrelationIdFilter.HEADER_NAME, "request-comment-123"))
                 .andRespond(withSuccess("{\"postId\":10,\"authorId\":1}", MediaType.APPLICATION_JSON));
 
         assertThat(client.existsById(10)).isTrue();

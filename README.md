@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first five observability phases (metrics, Prometheus, Grafana, Alertmanager, and centralized logging) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first six observability phases (metrics, Prometheus, Grafana, Alertmanager, centralized logging, and end-to-end correlation IDs) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -97,6 +97,7 @@ Completed improvements:
 - Added a pinned Grafana deployment with a provisioned Prometheus datasource and version-controlled platform, event-pipeline, and per-service dashboards
 - Added pinned Alertmanager routing with severity-based email delivery, alert grouping, inhibition, silences, local Mailpit verification, and a secret-backed production SMTP template
 - Added ECS JSON application logs, Filebeat collection, 14-day Elasticsearch retention, and a provisioned Kibana data view for centralized investigation
+- Propagated validated correlation IDs through the reactive gateway, servlet services, private HTTP clients, transactional outbox, Kafka records, and notification consumer MDC
 
 ## Documentation Map
 
@@ -114,6 +115,7 @@ Completed improvements:
 - [Observability Phase 3](docs/observability-phase-3.md) — provisioned Grafana, operator dashboards, secure access, incident workflow, and validation
 - [Observability Phase 4](docs/observability-phase-4.md) — Alertmanager routing, inhibition, silences, email delivery, secure SMTP, and operational runbooks
 - [Observability Phase 5](docs/observability-phase-5.md) — ECS structured logs, Filebeat, Elasticsearch retention, Kibana search, and incident investigation
+- [Observability Phase 6](docs/observability-phase-6.md) — HTTP, Reactor, MDC, outbox, Kafka correlation, Kibana searches, and incident workflow
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -280,6 +282,8 @@ Grafana runs at `http://localhost:3001`. Set a private `GRAFANA_ADMIN_PASSWORD` 
 Alertmanager runs at `http://localhost:9097`, and routed local email notifications appear at `http://localhost:8025`. See [Observability Phase 4](docs/observability-phase-4.md) for the delivery smoke test, routing policy, Kubernetes access, and production SMTP setup.
 
 Kibana runs at `http://localhost:5601` and Elasticsearch at `http://localhost:9200`. The provisioned **Blog Platform Logs** data view searches ECS JSON logs from all five active applications. See [Observability Phase 5](docs/observability-phase-5.md) for Docker/Kubernetes checks, KQL examples, retention, and security boundaries.
+
+Every API response returns `X-Correlation-Id`. The same value is searchable across synchronous services and the asynchronous Kafka notification path; see [Observability Phase 6](docs/observability-phase-6.md).
 
 Check container health status:
 
@@ -517,6 +521,7 @@ Security-related improvements already applied:
 - Git-provisioned Grafana datasource and dashboards with anonymous access disabled and persistent Docker/Kubernetes state
 - Alertmanager receiver routing, noise inhibition, local SMTP delivery testing, and a production SMTP password-file pattern
 - ECS JSON console logs, opt-in Filebeat collection, bounded Elasticsearch retention, and a provisioned Kibana data view
+- Validated correlation IDs across HTTP, Reactor context, servlet MDC, outbox persistence, Kafka headers, and consumers
 
 ## Deployment Roadmap
 
@@ -532,7 +537,8 @@ The S3 application adapter is complete but deliberately inactive in the current 
 6. Provisioned Grafana dashboards are complete; see `docs/observability-phase-3.md`.
 7. Alertmanager notification routing is complete; see `docs/observability-phase-4.md`.
 8. Centralized ECS structured logs, Elasticsearch retention, and Kibana search are complete; see `docs/observability-phase-5.md`.
-9. Propagate correlation context across every synchronous and asynchronous service boundary in the next observability phase.
+9. End-to-end correlation context across synchronous and asynchronous boundaries is complete; see `docs/observability-phase-6.md`.
+10. Add distributed tracing in Observability Phase 7 without coupling application code to a specific trace backend.
 
 The production Docker Compose and AWS runbook are available in:
 
@@ -561,6 +567,6 @@ Implemented migration strategy:
 5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
 6. Added reliable asynchronous publication with a transactional outbox and idempotent Kafka consumer.
 
-Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, end-to-end correlation, distributed traces, SLO automation, and managed-cloud Kubernetes only when operational scale justifies it.
+Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, distributed traces, SLO automation, and managed-cloud Kubernetes only when operational scale justifies it.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.

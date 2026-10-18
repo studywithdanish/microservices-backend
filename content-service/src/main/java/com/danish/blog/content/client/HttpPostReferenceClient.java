@@ -1,6 +1,7 @@
 package com.danish.blog.content.client;
 
 import com.danish.blog.content.error.DownstreamServiceException;
+import com.danish.blog.content.observability.CorrelationIdFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
@@ -21,7 +22,16 @@ public class HttpPostReferenceClient implements PostReferenceClient {
             @Value("${app.post-service.base-url}") String baseUrl,
             @Value("${app.internal.service-token}") String internalServiceToken
     ) {
-        this.restClient = builder.baseUrl(baseUrl).build();
+        this.restClient = builder
+                .baseUrl(baseUrl)
+                .requestInterceptor((request, body, execution) -> {
+                    request.getHeaders().set(
+                            CorrelationIdFilter.HEADER_NAME,
+                            CorrelationIdFilter.currentOrCreate()
+                    );
+                    return execution.execute(request, body);
+                })
+                .build();
         this.internalServiceToken = internalServiceToken;
     }
 

@@ -3,6 +3,7 @@ package com.danish.blog.post.service;
 import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.domain.Post;
 import com.danish.blog.post.event.PostPublishedEvent;
+import com.danish.blog.post.observability.CorrelationIdFilter;
 import com.danish.blog.post.observability.OutboxMetrics;
 import com.danish.blog.post.repository.OutboxEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -51,6 +52,7 @@ public class PostEventOutbox {
                     post.getId(),
                     POST_PUBLISHED,
                     objectMapper.writeValueAsString(event),
+                    CorrelationIdFilter.currentOrCreate(),
                     occurredAt
             ));
             metrics.recordCreated();
