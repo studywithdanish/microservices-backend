@@ -1,10 +1,13 @@
 package com.danish.blog.post.event;
 
 import com.danish.blog.post.domain.OutboxEvent;
-import com.danish.blog.post.repository.OutboxEventRepository;
+import com.danish.blog.post.observability.CorrelationIdFilter;
 import com.danish.blog.post.observability.OutboxMetrics;
+import com.danish.blog.post.repository.OutboxEventRepository;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -13,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 @Component
@@ -50,8 +54,21 @@ public class OutboxPublisher {
     }
 
     private void publish(OutboxEvent event) {
-        try {
-            kafkaTemplate.send(topic, event.getAggregateId().toString(), event.getPayload())
+        ProducerRecord<String, String> record = new ProducerRecord<>(
+                topic,
+                event.getAggregateId().toString(),
+                event.getPayload()
+        );
+        record.headers().add(
+                CorrelationIdFilter.HEADER_NAME,
+                event.getCorrelationId().getBytes(StandardCharsets.UTF_8)
+        );
+
+        try (MDC.MDCCloseable ignored = MDC.putCloseable(
+                CorrelationIdFilter.MDC_KEY,
+                event.getCorrelationId()
+        )) {
+            kafkaTemplate.send(record)
                     .get(publishTimeout.toMillis(), TimeUnit.MILLISECONDS);
             event.markPublished(Instant.now());
             outboxEventRepository.save(event);

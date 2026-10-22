@@ -4,6 +4,7 @@ import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.domain.Post;
 import com.danish.blog.post.event.PostPublishedEvent;
 import com.danish.blog.post.observability.OutboxMetrics;
+import com.danish.blog.post.observability.CorrelationIdFilter;
 import com.danish.blog.post.repository.OutboxEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.MDC;
 
 import java.util.Date;
 
@@ -40,7 +42,12 @@ class PostEventOutboxTest {
         post.setImageName("default.png");
         post.setAddedDate(new Date());
 
-        outbox.recordPostPublished(post);
+        MDC.put(CorrelationIdFilter.MDC_KEY, "request-publish-123");
+        try {
+            outbox.recordPostPublished(post);
+        } finally {
+            MDC.clear();
+        }
 
         ArgumentCaptor<OutboxEvent> captor = ArgumentCaptor.forClass(OutboxEvent.class);
         verify(outboxEventRepository).save(captor.capture());
@@ -52,5 +59,6 @@ class PostEventOutboxTest {
         assertThat(event.eventVersion()).isEqualTo(1);
         assertThat(event.postId()).isEqualTo(42);
         assertThat(event.authorId()).isEqualTo(7);
+        assertThat(captor.getValue().getCorrelationId()).isEqualTo("request-publish-123");
     }
 }

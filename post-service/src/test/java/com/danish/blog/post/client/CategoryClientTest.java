@@ -3,8 +3,11 @@ package com.danish.blog.post.client;
 import com.danish.blog.post.api.CategorySnapshot;
 import com.danish.blog.post.error.DownstreamServiceException;
 import com.danish.blog.post.error.ResourceNotFoundException;
+import com.danish.blog.post.observability.CorrelationIdFilter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -12,6 +15,7 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -28,9 +32,16 @@ class CategoryClientTest {
         categoryClient = new CategoryClient(builder, "http://content-service:9094");
     }
 
+    @AfterEach
+    void clearMdc() {
+        MDC.clear();
+    }
+
     @Test
     void loadsCategorySnapshotFromContentService() {
+        MDC.put(CorrelationIdFilter.MDC_KEY, "request-category-123");
         server.expect(requestTo("http://content-service:9094/api/categories/3"))
+                .andExpect(header(CorrelationIdFilter.HEADER_NAME, "request-category-123"))
                 .andRespond(withSuccess(
                         "{\"categoryId\":3,\"categoryTitle\":\"Spring\",\"categoryDescription\":\"Articles\"}",
                         MediaType.APPLICATION_JSON

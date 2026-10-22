@@ -3,6 +3,8 @@ package com.danish.blog.gateway.error;
 import com.danish.blog.gateway.filter.CorrelationIdFilter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -23,6 +25,7 @@ import java.util.concurrent.TimeoutException;
 @Order(-2)
 public class GatewayUnavailableExceptionHandler implements ErrorWebExceptionHandler {
 
+    private static final Logger logger = LoggerFactory.getLogger(GatewayUnavailableExceptionHandler.class);
     private final ObjectMapper objectMapper;
 
     public GatewayUnavailableExceptionHandler(ObjectMapper objectMapper) {
@@ -44,6 +47,14 @@ public class GatewayUnavailableExceptionHandler implements ErrorWebExceptionHand
             exchange.getResponse().getHeaders()
                     .set(CorrelationIdFilter.CORRELATION_ID_HEADER, correlationId);
         }
+        logger.warn(
+                "Gateway request failed method={} path={} status={} code={} cause={}",
+                exchange.getRequest().getMethod(),
+                exchange.getRequest().getPath().value(),
+                failure.status().value(),
+                failure.code(),
+                rootCauseType(exception)
+        );
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("timestamp", Instant.now().toString());
@@ -97,6 +108,14 @@ public class GatewayUnavailableExceptionHandler implements ErrorWebExceptionHand
                 || exception.getClass().getSimpleName().endsWith("TimeoutException")
                 || (exception instanceof ResponseStatusException statusException
                 && statusException.getStatusCode().value() == HttpStatus.GATEWAY_TIMEOUT.value());
+    }
+
+    private String rootCauseType(Throwable exception) {
+        Throwable current = exception;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getClass().getSimpleName();
     }
 
     private record GatewayFailure(HttpStatus status, String code, String message) {
