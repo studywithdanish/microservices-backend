@@ -18,6 +18,8 @@ pipeline {
         PROMETHEUS_IMAGE = 'prom/prometheus:v3.15.0'
         ALERTMANAGER_IMAGE = 'prom/alertmanager:v0.34.1'
         FILEBEAT_IMAGE = 'docker.elastic.co/beats/filebeat:9.3.1'
+        TEMPO_IMAGE = 'grafana/tempo:3.1.0'
+        OTEL_COLLECTOR_IMAGE = 'otel/opentelemetry-collector-contrib:0.163.2'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -124,6 +126,7 @@ pipeline {
                     validatePrometheusConfiguration()
                     validateAlertmanagerConfiguration()
                     validateCentralizedLoggingConfiguration()
+                    validateTracingConfiguration()
                 }
             }
         }
@@ -199,4 +202,13 @@ void validateCentralizedLoggingConfiguration() {
 
     runCommand("docker run --rm -e NODE_NAME=ci-node -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 -v \"${configDirectory}:/usr/share/filebeat/config:ro\" ${env.FILEBEAT_IMAGE} filebeat test config -c /usr/share/filebeat/config/filebeat.docker.yml -e --strict.perms=false")
     runCommand("docker run --rm -e NODE_NAME=ci-node -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 -v \"${configDirectory}:/usr/share/filebeat/config:ro\" ${env.FILEBEAT_IMAGE} filebeat test config -c /usr/share/filebeat/config/filebeat.kubernetes.yml -e --strict.perms=false")
+}
+
+void validateTracingConfiguration() {
+    String configDirectory = isUnix()
+            ? "${env.WORKSPACE}/deploy/k8s/tracing"
+            : "${env.WORKSPACE}\\deploy\\k8s\\tracing"
+
+    runCommand("docker run --rm -v \"${configDirectory}:/etc/tempo:ro\" ${env.TEMPO_IMAGE} \"-config.file=/etc/tempo/tempo.yml\" \"-config.verify=true\" \"-config.verify-errors-only=true\"")
+    runCommand("docker run --rm -v \"${configDirectory}:/etc/otelcol-contrib:ro\" ${env.OTEL_COLLECTOR_IMAGE} validate --config=/etc/otelcol-contrib/otel-collector.yml")
 }

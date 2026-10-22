@@ -3,6 +3,7 @@ package com.danish.blog.post.event;
 import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.observability.CorrelationIdFilter;
 import com.danish.blog.post.observability.OutboxMetrics;
+import com.danish.blog.post.observability.OutboxTraceContext;
 import com.danish.blog.post.repository.OutboxEventRepository;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
@@ -30,19 +31,22 @@ public class OutboxPublisher {
     private final String topic;
     private final Duration publishTimeout;
     private final OutboxMetrics metrics;
+    private final OutboxTraceContext traceContext;
 
     public OutboxPublisher(
             OutboxEventRepository outboxEventRepository,
             KafkaTemplate<String, String> kafkaTemplate,
             @Value("${app.kafka.topics.post-published}") String topic,
             @Value("${app.kafka.outbox.publish-timeout-seconds:10}") long publishTimeoutSeconds,
-            OutboxMetrics metrics
+            OutboxMetrics metrics,
+            OutboxTraceContext traceContext
     ) {
         this.outboxEventRepository = outboxEventRepository;
         this.kafkaTemplate = kafkaTemplate;
         this.topic = topic;
         this.publishTimeout = Duration.ofSeconds(publishTimeoutSeconds);
         this.metrics = metrics;
+        this.traceContext = traceContext;
     }
 
     @Scheduled(fixedDelayString = "${app.kafka.outbox.poll-interval-ms:1000}")
@@ -64,16 +68,22 @@ public class OutboxPublisher {
                 event.getCorrelationId().getBytes(StandardCharsets.UTF_8)
         );
 
-        try (MDC.MDCCloseable ignored = MDC.putCloseable(
-                CorrelationIdFilter.MDC_KEY,
-                event.getCorrelationId()
-        )) {
-            kafkaTemplate.send(record)
-                    .get(publishTimeout.toMillis(), TimeUnit.MILLISECONDS);
-            event.markPublished(Instant.now());
-            outboxEventRepository.save(event);
-            metrics.recordPublished();
-            logger.info("Published outbox event {} to topic {}", event.getEventId(), topic);
+        try (OutboxTraceContext.PublishScope traceScope = traceContext.openPublishScope(event, topic);
+             MDC.MDCCloseable ignored = MDC.putCloseable(
+                     CorrelationIdFilter.MDC_KEY,
+                     event.getCorrelationId()
+             )) {
+            try {
+                kafkaTemplate.send(record)
+                        .get(publishTimeout.toMillis(), TimeUnit.MILLISECONDS);
+                event.markPublished(Instant.now());
+                outboxEventRepository.save(event);
+                metrics.recordPublished();
+                logger.info("Published outbox event {} to topic {}", event.getEventId(), topic);
+            } catch (Exception exception) {
+                traceScope.error(exception);
+                throw exception;
+            }
         } catch (Exception exception) {
             event.markFailed(exception.getMessage(), Instant.now());
             outboxEventRepository.save(event);

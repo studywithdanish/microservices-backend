@@ -40,6 +40,13 @@ flowchart LR
         Notification -.->|ECS JSON stdout| Filebeat
         Filebeat -->|daily indices| Elasticsearch[(Elasticsearch<br/>14-day logs)]
         Kibana[Kibana<br/>Discover] -->|search and filter| Elasticsearch
+        Gateway -.->|OTLP/HTTP| Collector[OpenTelemetry Collector]
+        Identity -.->|OTLP/HTTP| Collector
+        Post -.->|OTLP/HTTP| Collector
+        Content -.->|OTLP/HTTP| Collector
+        Notification -.->|OTLP/HTTP| Collector
+        Collector -->|batched OTLP/gRPC| Tempo[(Grafana Tempo)]
+        Grafana -->|TraceQL and service graph| Tempo
     end
 ```
 
@@ -112,6 +119,7 @@ sequenceDiagram
 - Flyway owns schema creation; production uses Hibernate validation rather than automatic mutation.
 - Post creation atomically records an outbox event, so Kafka downtime does not lose publication intent.
 - Notification consumption is idempotent, and retry exhaustion routes malformed or repeatedly failing events to a DLT.
+- W3C trace context is stored with outbox events and restored during delayed publication, preserving the HTTP-to-Kafka trace without keeping a request span open.
 
 ## Metrics Observability
 
@@ -129,7 +137,17 @@ sequenceDiagram
 - Filebeat collects only explicitly opted-in application containers/pods and writes daily `blog-platform-logs-*` indices.
 - Elasticsearch applies a 14-day deletion lifecycle; Kibana provisions the **Blog Platform Logs** data view for service, severity, message, container, and pod searches.
 - Elasticsearch and Kibana are available on ports `9200` and `5601` locally and only through SSH tunnels or Kubernetes port-forwards in production-style environments.
-- Metrics identify the failing component and time window; centralized logs provide exception evidence; correlation IDs connect the complete synchronous and asynchronous request journey. Distributed traces are the next deeper latency view.
+- Metrics identify the failing component and time window; distributed traces show the cross-service latency waterfall; centralized logs provide exception evidence; correlation IDs connect retries and customer-visible requests.
+
+## Distributed tracing workflow
+
+- Micrometer instruments HTTP servers, managed HTTP clients, and Spring Kafka without business code depending on Tempo.
+- Every active service exports OTLP/HTTP to a private OpenTelemetry Collector, which applies memory limiting and batching before exporting OTLP/gRPC to Tempo.
+- Grafana is provisioned with Tempo for TraceQL search, waterfall views, service graphs, and links from spans to Elasticsearch logs.
+- Spring tracing places `traceId` and `spanId` in MDC, and the Elasticsearch index template maps them as keyword fields.
+- Post Service stores `traceparent` and `tracestate` beside each outbox event; the relay restores the parent before Kafka observation injects message headers.
+- Local environments sample all requests for demonstrations. Production Compose defaults to ten percent and can be tuned with `TRACING_SAMPLING_PROBABILITY`.
+- Tempo uses local persistent storage only for local and portfolio environments; a real production deployment requires authenticated private access and replicated object storage.
 
 ## Correlation workflow
 

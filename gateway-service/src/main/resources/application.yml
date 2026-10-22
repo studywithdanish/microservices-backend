@@ -48,6 +48,12 @@ spring:
           trusted-proxies: ${GATEWAY_TRUSTED_PROXIES:127\.0\.0\.1|10\..*|172\.(1[6-9]|2[0-9]|3[0-1])\..*|192\.168\..*}
 
 management:
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:http://localhost:4318/v1/traces}
   prometheus:
     metrics:
       export:

@@ -35,6 +35,12 @@ public class OutboxEvent {
     @Column(name = "correlation_id", nullable = false, length = 128)
     private String correlationId;
 
+    @Column(length = 55)
+    private String traceparent;
+
+    @Column(length = 512)
+    private String tracestate;
+
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
 
@@ -60,6 +66,8 @@ public class OutboxEvent {
             String eventType,
             String payload,
             String correlationId,
+            String traceparent,
+            String tracestate,
             Instant occurredAt
     ) {
         this.eventId = eventId;
@@ -68,6 +76,8 @@ public class OutboxEvent {
         this.eventType = eventType;
         this.payload = payload;
         this.correlationId = correlationId;
+        this.traceparent = traceparent;
+        this.tracestate = tracestate;
         this.occurredAt = occurredAt;
         this.nextAttemptAt = occurredAt;
     }
@@ -79,6 +89,8 @@ public class OutboxEvent {
             String eventType,
             String payload,
             String correlationId,
+            String traceparent,
+            String tracestate,
             Instant occurredAt
     ) {
         return new OutboxEvent(
@@ -88,6 +100,8 @@ public class OutboxEvent {
                 eventType,
                 payload,
                 correlationId,
+                traceparent,
+                tracestate,
                 occurredAt
         );
     }
@@ -118,6 +132,14 @@ public class OutboxEvent {
 
     public String getCorrelationId() {
         return correlationId;
+    }
+
+    public String getTraceparent() {
+        return traceparent;
+    }
+
+    public String getTracestate() {
+        return tracestate;
     }
 
     public Instant getOccurredAt() {

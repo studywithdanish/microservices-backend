@@ -74,7 +74,7 @@ For this project size, each is too small to justify separate operational overhea
 
 ### What would you change for a larger production system?
 
-Use asymmetric JWT signing and JWKS, a secrets manager, centralized logs/traces/metrics, resilience policies backed by service-level objectives, an event broker for snapshot updates, independent delivery pipelines, and infrastructure as code. Kubernetes would be introduced only when the scale and operational team justify it.
+Use asymmetric JWT signing and JWKS, a secrets manager, managed trace/object storage with tail sampling, resilience policies backed by service-level objectives, independent delivery pipelines, and infrastructure as code. Kubernetes would be introduced only when the scale and operational team justify it.
 
 ### Where are distributed transactions?
 

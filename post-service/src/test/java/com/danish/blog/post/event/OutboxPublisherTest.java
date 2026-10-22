@@ -3,6 +3,9 @@ package com.danish.blog.post.event;
 import com.danish.blog.post.domain.OutboxEvent;
 import com.danish.blog.post.repository.OutboxEventRepository;
 import com.danish.blog.post.observability.OutboxMetrics;
+import com.danish.blog.post.observability.OutboxTraceContext;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +50,8 @@ class OutboxPublisherTest {
                 kafkaTemplate,
                 "blog.posts.published.v1",
                 1,
-                metrics
+                metrics,
+                new OutboxTraceContext(Tracer.NOOP, Propagator.NOOP)
         );
         event = OutboxEvent.pending(
                 UUID.randomUUID(),
@@ -56,6 +60,8 @@ class OutboxPublisherTest {
                 "PostPublished",
                 "{\"postId\":42}",
                 "request-outbox-123",
+                null,
+                null,
                 Instant.now()
         );
         when(outboxEventRepository

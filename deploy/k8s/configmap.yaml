@@ -5,6 +5,8 @@ metadata:
 data:
   SPRING_PROFILES_ACTIVE: prod
   METRICS_ENVIRONMENT: local-kubernetes
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+  TRACING_SAMPLING_PROBABILITY: "1.0"
   IDENTITY_MYSQL_DATABASE: blog_identity
   IDENTITY_DB_USERNAME: identity_user
   POST_MYSQL_DATABASE: blog_posts
