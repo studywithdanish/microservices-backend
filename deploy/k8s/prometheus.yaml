@@ -54,6 +54,8 @@ spec:
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time=15d
             - --web.enable-lifecycle
+            - --web.enable-remote-write-receiver
+            - --enable-feature=exemplar-storage
           ports:
             - name: web
               containerPort: 9090

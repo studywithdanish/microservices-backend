@@ -112,6 +112,10 @@ spec:
               subPath: prometheus.yml
               readOnly: true
             - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/datasources/tempo.yml
+              subPath: tempo.yml
+              readOnly: true
+            - name: grafana-provisioning
               mountPath: /etc/grafana/provisioning/dashboards/dashboards.yml
               subPath: dashboards.yml
               readOnly: true

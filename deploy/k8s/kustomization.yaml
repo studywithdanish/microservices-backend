@@ -12,6 +12,7 @@ resources:
   - grafana.yaml
   - alertmanager.yaml
   - logging.yaml
+  - tracing.yaml
 configMapGenerator:
   - name: prometheus-config
     files:
@@ -20,6 +21,7 @@ configMapGenerator:
   - name: grafana-provisioning
     files:
       - prometheus.yml=grafana/provisioning/datasources/prometheus.yml
+      - tempo.yml=grafana/provisioning/datasources/tempo.yml
       - dashboards.yml=grafana/provisioning/dashboards/dashboards.yml
   - name: grafana-dashboards
     files:
@@ -36,6 +38,10 @@ configMapGenerator:
       - setup-logging.sh=logging/setup-logging.sh
       - ilm-policy.json=logging/ilm-policy.json
       - index-template.json=logging/index-template.json
+  - name: tracing-config
+    files:
+      - otel-collector.yml=tracing/otel-collector.yml
+      - tempo.yml=tracing/tempo.yml
 labels:
   - includeSelectors: true
     pairs:

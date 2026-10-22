@@ -1,6 +1,6 @@
 # Local Kubernetes Runbook
 
-This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, and local Mailpit inbox remain cluster-internal.
+This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Grafana, Tempo, OpenTelemetry Collector, Alertmanager, Elasticsearch, Kibana, Filebeat, and local Mailpit inbox remain cluster-internal.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ The script performs these steps:
 1. Builds the five active Spring Boot service images and the React/Nginx image.
 2. Loads all images into the selected Minikube profile.
 3. Generates a Kubernetes Secret only when one does not already exist.
-4. Deploys four MySQL StatefulSets, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, and Mailpit with persistent state where required.
+4. Deploys four MySQL StatefulSets, Kafka, Prometheus, Grafana, Tempo, OpenTelemetry Collector, Alertmanager, Elasticsearch, Kibana, Filebeat, and Mailpit with persistent state where required.
 5. Waits for the databases and Kafka before deploying the services, gateway, and frontend.
 6. Waits until every application Deployment is available.
 
@@ -85,6 +85,14 @@ $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.
 ```
 
 Sign in with user `admin`. The **Blog Platform** folder contains the overview, event-pipeline, and service-detail dashboards.
+
+Tempo is internal. Grafana already queries it, but direct diagnostics can use a temporary port-forward:
+
+```powershell
+kubectl -n blog-platform port-forward service/tempo 13200:3200
+```
+
+Open `http://localhost:13200/ready`, or use Grafana **Explore** with the provisioned **Tempo** data source. See `docs/observability-phase-7.md` for TraceQL searches and trace-to-log investigation.
 
 To inspect Alertmanager and the local email inbox, start two more port-forwards:
 

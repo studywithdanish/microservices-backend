@@ -60,6 +60,16 @@ spec:
               value: local-kubernetes
             - name: LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH
               value: "16384"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+            - name: TRACING_SAMPLING_PROBABILITY
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: TRACING_SAMPLING_PROBABILITY
             - name: IDENTITY_DB_URL
               value: jdbc:mysql://identity-mysql:3306/blog_identity?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: IDENTITY_DB_USERNAME
@@ -189,6 +199,16 @@ spec:
               value: local-kubernetes
             - name: LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH
               value: "16384"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+            - name: TRACING_SAMPLING_PROBABILITY
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: TRACING_SAMPLING_PROBABILITY
             - name: POST_DB_URL
               value: jdbc:mysql://post-mysql:3306/blog_posts?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: POST_DB_USERNAME
@@ -321,6 +341,16 @@ spec:
               value: local-kubernetes
             - name: LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH
               value: "16384"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+            - name: TRACING_SAMPLING_PROBABILITY
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: TRACING_SAMPLING_PROBABILITY
             - name: CONTENT_DB_URL
               value: jdbc:mysql://content-mysql:3306/blog_content?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: CONTENT_DB_USERNAME
@@ -444,6 +474,16 @@ spec:
               value: local-kubernetes
             - name: LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH
               value: "16384"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+            - name: TRACING_SAMPLING_PROBABILITY
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: TRACING_SAMPLING_PROBABILITY
             - name: NOTIFICATION_DB_URL
               value: jdbc:mysql://notification-mysql:3306/blog_notifications?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
             - name: NOTIFICATION_DB_USERNAME
@@ -565,6 +605,16 @@ spec:
               value: local-kubernetes
             - name: LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH
               value: "16384"
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+            - name: TRACING_SAMPLING_PROBABILITY
+              valueFrom:
+                configMapKeyRef:
+                  name: blog-config
+                  key: TRACING_SAMPLING_PROBABILITY
             - name: IDENTITY_BASE_URL
               value: http://identity-service:9092
             - name: POST_SERVICE_BASE_URL

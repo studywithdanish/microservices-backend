@@ -117,6 +117,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
       LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
@@ -148,6 +150,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
       LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
@@ -180,6 +184,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
       LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
@@ -211,6 +217,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
       LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
@@ -245,6 +253,8 @@ services:
         condition: service_healthy
     environment:
       METRICS_ENVIRONMENT: ${METRICS_ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      TRACING_SAMPLING_PROBABILITY: ${TRACING_SAMPLING_PROBABILITY:-1.0}
       LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       LOGGING_STRUCTURED_ECS_SERVICE_ENVIRONMENT: ${LOG_ENVIRONMENT:-local}
       LOGGING_STRUCTURED_JSON_STACKTRACE_MAX_LENGTH: ${LOG_STACKTRACE_MAX_LENGTH:-16384}
@@ -294,6 +304,8 @@ services:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
       - --web.enable-lifecycle
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
       - --cluster.listen-address=
       - --enable-feature=utf8-strict-mode
     ports:
@@ -335,12 +347,39 @@ services:
       retries: 5
     restart: unless-stopped
 
+  tempo:
+    image: grafana/tempo:3.1.0
+    container_name: blog-tempo
+    command: ["-target=all", "-config.file=/etc/tempo/tempo.yml"]
+    ports:
+      - "${TEMPO_PORT:-3200}:3200"
+    volumes:
+      - ./deploy/k8s/tracing/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo_data:/var/tempo
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.163.2
+    container_name: blog-otel-collector
+    command: ["--config=/etc/otelcol-contrib/collector.yml"]
+    depends_on:
+      tempo:
+        condition: service_started
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
+    volumes:
+      - ./deploy/k8s/tracing/otel-collector.yml:/etc/otelcol-contrib/collector.yml:ro
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:13.2.4
     container_name: blog-grafana
     depends_on:
       prometheus:
         condition: service_healthy
+      tempo:
+        condition: service_started
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-this-local-grafana-password}
@@ -355,6 +394,7 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
       - ./deploy/k8s/grafana/provisioning/datasources/prometheus.yml:/etc/grafana/provisioning/datasources/prometheus.yml:ro
+      - ./deploy/k8s/grafana/provisioning/datasources/tempo.yml:/etc/grafana/provisioning/datasources/tempo.yml:ro
       - ./deploy/k8s/grafana/provisioning/dashboards/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
       - ./deploy/k8s/grafana/dashboards:/etc/grafana/dashboards:ro
     healthcheck:
@@ -447,3 +487,4 @@ volumes:
   mailpit_data:
   elasticsearch_data:
   filebeat_data:
+  tempo_data:

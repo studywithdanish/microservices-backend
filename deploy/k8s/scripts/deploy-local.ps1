@@ -99,7 +99,7 @@ Invoke-Checked kubectl @('apply', '-k', $k8sRoot)
 
 Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', 'statefulset/elasticsearch', '--timeout=300s')
 
-foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'mailpit', 'alertmanager', 'prometheus', 'grafana', 'kibana')) {
+foreach ($deployment in @('identity-service', 'post-service', 'content-service', 'notification-service', 'api-gateway', 'frontend', 'mailpit', 'alertmanager', 'prometheus', 'tempo', 'otel-collector', 'grafana', 'kibana')) {
     Invoke-Checked kubectl @('-n', $namespace, 'rollout', 'status', "deployment/$deployment", '--timeout=300s')
 }
 
@@ -117,3 +117,4 @@ Write-Host 'Alertmanager access: kubectl -n blog-platform port-forward service/a
 Write-Host 'Local alert inbox: kubectl -n blog-platform port-forward service/mailpit 18025:8025'
 Write-Host 'Kibana access: kubectl -n blog-platform port-forward service/kibana 15601:5601'
 Write-Host 'Elasticsearch diagnostics: kubectl -n blog-platform port-forward service/elasticsearch 19200:9200'
+Write-Host 'Tempo diagnostics: kubectl -n blog-platform port-forward service/tempo 13200:3200'

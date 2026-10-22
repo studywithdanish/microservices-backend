@@ -58,6 +58,14 @@
           "type": "keyword",
           "ignore_above": 256
         },
+        "traceId": {
+          "type": "keyword",
+          "ignore_above": 64
+        },
+        "spanId": {
+          "type": "keyword",
+          "ignore_above": 32
+        },
         "trace.id": {
           "type": "keyword",
           "ignore_above": 256

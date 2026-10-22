@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first six observability phases (metrics, Prometheus, Grafana, Alertmanager, centralized logging, and end-to-end correlation IDs) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first seven observability phases (metrics, Prometheus, Grafana, Alertmanager, centralized logging, correlation IDs, and distributed tracing) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -29,11 +29,18 @@ flowchart LR
     Alertmanager --> Operator[Operator email]
     Filebeat[Filebeat log collector] --> Elasticsearch[(Elasticsearch logs)]
     Elasticsearch --> Kibana[Kibana Discover]
+    Collector[OpenTelemetry Collector] --> Tempo[(Grafana Tempo)]
+    Grafana --> Tempo
     Gateway -. ECS JSON .-> Filebeat
     Identity -. ECS JSON .-> Filebeat
     Post -. ECS JSON .-> Filebeat
     Content -. ECS JSON .-> Filebeat
     Notification -. ECS JSON .-> Filebeat
+    Gateway -. OTLP traces .-> Collector
+    Identity -. OTLP traces .-> Collector
+    Post -. OTLP traces .-> Collector
+    Content -. OTLP traces .-> Collector
+    Notification -. OTLP traces .-> Collector
     Prometheus -. private metrics .-> Gateway
     Prometheus -. private metrics .-> Identity
     Prometheus -. private metrics .-> Post
@@ -98,6 +105,7 @@ Completed improvements:
 - Added pinned Alertmanager routing with severity-based email delivery, alert grouping, inhibition, silences, local Mailpit verification, and a secret-backed production SMTP template
 - Added ECS JSON application logs, Filebeat collection, 14-day Elasticsearch retention, and a provisioned Kibana data view for centralized investigation
 - Propagated validated correlation IDs through the reactive gateway, servlet services, private HTTP clients, transactional outbox, Kafka records, and notification consumer MDC
+- Added Micrometer/OpenTelemetry tracing, an OTLP Collector, Tempo, Grafana trace-to-logs, service graphs, and trace continuation through the database outbox and Kafka
 
 ## Documentation Map
 
@@ -116,6 +124,7 @@ Completed improvements:
 - [Observability Phase 4](docs/observability-phase-4.md) — Alertmanager routing, inhibition, silences, email delivery, secure SMTP, and operational runbooks
 - [Observability Phase 5](docs/observability-phase-5.md) — ECS structured logs, Filebeat, Elasticsearch retention, Kibana search, and incident investigation
 - [Observability Phase 6](docs/observability-phase-6.md) — HTTP, Reactor, MDC, outbox, Kafka correlation, Kibana searches, and incident workflow
+- [Observability Phase 7](docs/observability-phase-7.md) — OpenTelemetry instrumentation, Collector, Tempo, service graphs, trace-to-logs, sampling, and outbox/Kafka tracing
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -245,6 +254,7 @@ The API Gateway exposes authenticated reads at `GET /api/notifications` and owne
 - Grafana 13.2
 - Alertmanager 0.34
 - Elasticsearch, Kibana, and Filebeat 9.3.1
+- OpenTelemetry Collector 0.163.2 and Grafana Tempo 3.1
 - Mailpit 1.31 for local notification capture
 - JUnit 5, Mockito, MockMvc, Spring Security Test
 
@@ -256,7 +266,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start all four databases, all four business services, Kafka, the gateway, Prometheus, Grafana, Alertmanager, the local alert inbox, Elasticsearch, Kibana, and Filebeat:
+Start all four databases, all four business services, Kafka, the gateway, Prometheus, Grafana, Alertmanager, the local alert inbox, Elasticsearch, Kibana, Filebeat, OpenTelemetry Collector, and Tempo:
 
 ```bash
 docker compose up --build
@@ -284,6 +294,8 @@ Alertmanager runs at `http://localhost:9097`, and routed local email notificatio
 Kibana runs at `http://localhost:5601` and Elasticsearch at `http://localhost:9200`. The provisioned **Blog Platform Logs** data view searches ECS JSON logs from all five active applications. See [Observability Phase 5](docs/observability-phase-5.md) for Docker/Kubernetes checks, KQL examples, retention, and security boundaries.
 
 Every API response returns `X-Correlation-Id`. The same value is searchable across synchronous services and the asynchronous Kafka notification path; see [Observability Phase 6](docs/observability-phase-6.md).
+
+Distributed traces now connect Gateway, synchronous service calls, the transactional outbox, Kafka publication, and Notification consumption. Grafana provides trace search, service graphs, and trace-to-log links; see [Observability Phase 7](docs/observability-phase-7.md).
 
 Check container health status:
 
@@ -374,7 +386,7 @@ Pipeline stages:
 - Verify Java and Maven versions
 - Run legacy rollback backend plus Gateway, Identity, Post, Content, and Notification Maven tests
 - Publish JUnit test reports
-- Validate local and production Compose, Kubernetes manifests, Prometheus scrape/rule configuration, Grafana dashboard JSON, both Alertmanager routing configurations, and both Filebeat collectors
+- Validate local and production Compose, Kubernetes manifests, Prometheus scrape/rule configuration, Grafana dashboard JSON, both Alertmanager routing configurations, both Filebeat collectors, and the pinned Tempo/Collector configurations
 - Package all five Spring Boot applications, including the retained rollback application
 - Build the five active service images plus the retained rollback image
 - Validate Docker Compose and Kubernetes deployment configuration
@@ -435,6 +447,8 @@ Important variables:
 - `GATEWAY_PORT`
 - `PROMETHEUS_PORT`
 - `PROMETHEUS_RETENTION`
+- `TRACING_SAMPLING_PROBABILITY`
+- `TEMPO_PORT`
 - `IDENTITY_BASE_URL` (manual non-Docker gateway runs)
 - `POST_SERVICE_BASE_URL` (manual non-Docker gateway runs)
 - `CONTENT_SERVICE_BASE_URL` (manual non-Docker gateway runs)
@@ -460,7 +474,7 @@ The API Gateway exposes only safe public Actuator endpoints by default:
 /actuator/info
 ```
 
-These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 15 days of data by default. Grafana queries Prometheus privately and provides authenticated operator dashboards. Alertmanager receives evaluated alerts and applies grouping, inhibition, silences, and severity routing. Filebeat ships ECS JSON application logs to 14-day Elasticsearch indices, and Kibana provides the private log-investigation UI. None of these operator tools is embedded in the public React application.
+These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 15 days of data by default. Grafana queries Prometheus and Tempo privately and provides authenticated metrics, service-graph, and trace views. Alertmanager receives evaluated alerts and applies grouping, inhibition, silences, and severity routing. Filebeat ships ECS JSON application logs to 14-day Elasticsearch indices, and Kibana provides the private log-investigation UI. The OpenTelemetry Collector is the private trace-ingestion boundary. None of these operator tools is embedded in the public React application.
 
 ## Production Readiness
 
@@ -475,7 +489,7 @@ Important deployment behavior:
 - Secrets and environment-specific values are passed through environment variables
 - CORS must be restricted to the deployed frontend URL
 - The public reverse proxy exposes only `/actuator/health` and `/actuator/info`; internal service ports also expose `/actuator/prometheus`
-- Production Prometheus, Grafana, Alertmanager, Elasticsearch, and Kibana bind to loopback and require authenticated SSH tunnels; Kubernetes uses temporary operator port-forwards
+- Production Prometheus, Grafana, Tempo, Alertmanager, Elasticsearch, and Kibana bind to loopback and require authenticated SSH tunnels; Kubernetes uses temporary operator port-forwards
 - Post images remain on the local volume unless the additional `aws` profile and S3 bucket configuration are supplied
 
 For a frontend deployed at `https://your-domain.com`, use:
@@ -522,6 +536,7 @@ Security-related improvements already applied:
 - Alertmanager receiver routing, noise inhibition, local SMTP delivery testing, and a production SMTP password-file pattern
 - ECS JSON console logs, opt-in Filebeat collection, bounded Elasticsearch retention, and a provisioned Kibana data view
 - Validated correlation IDs across HTTP, Reactor context, servlet MDC, outbox persistence, Kafka headers, and consumers
+- Backend-neutral OpenTelemetry tracing, Collector batching, Tempo storage, Grafana trace exploration, and outbox/Kafka trace continuation
 
 ## Deployment Roadmap
 
@@ -538,7 +553,7 @@ The S3 application adapter is complete but deliberately inactive in the current 
 7. Alertmanager notification routing is complete; see `docs/observability-phase-4.md`.
 8. Centralized ECS structured logs, Elasticsearch retention, and Kibana search are complete; see `docs/observability-phase-5.md`.
 9. End-to-end correlation context across synchronous and asynchronous boundaries is complete; see `docs/observability-phase-6.md`.
-10. Add distributed tracing in Observability Phase 7 without coupling application code to a specific trace backend.
+10. Distributed tracing is complete in Observability Phase 7 without coupling application code to a specific trace backend; see `docs/observability-phase-7.md`.
 
 The production Docker Compose and AWS runbook are available in:
 
@@ -567,6 +582,6 @@ Implemented migration strategy:
 5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
 6. Added reliable asynchronous publication with a transactional outbox and idempotent Kafka consumer.
 
-Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, distributed traces, SLO automation, and managed-cloud Kubernetes only when operational scale justifies it.
+Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, trace-tail sampling, SLO automation, managed Tempo object storage, and managed-cloud Kubernetes only when operational scale justifies it.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.
