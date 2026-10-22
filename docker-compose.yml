@@ -332,7 +332,7 @@ services:
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
-      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-15d}
+      - --storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-35d}
       - --web.enable-lifecycle
     ports:
       - "${PROMETHEUS_PORT:-9096}:9090"

@@ -52,6 +52,16 @@ receivers:
 inhibit_rules:
   - source_matchers:
       - 'severity="critical"'
+      - 'slo=~".+"'
+    target_matchers:
+      - 'severity="warning"'
+      - 'slo=~".+"'
+    equal:
+      - service
+      - slo
+
+  - source_matchers:
+      - 'severity="critical"'
     target_matchers:
       - 'severity="warning"'
     equal:

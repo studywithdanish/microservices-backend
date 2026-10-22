@@ -84,7 +84,9 @@ $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.
 [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))
 ```
 
-Sign in with user `admin`. The **Blog Platform** folder contains the overview, event-pipeline, and service-detail dashboards.
+Sign in with user `admin`. The **Blog Platform** folder contains the overview, event-pipeline, service-detail, and SLO/error-budget dashboards.
+
+The SLO dashboard evaluates 99.5% availability and 95% of requests under two seconds over a rolling 30-day window. See `docs/observability-phase-8.md` for burn-rate alerts and the incident workflow.
 
 Tempo is internal. Grafana already queries it, but direct diagnostics can use a temporary port-forward:
 
