@@ -1,0 +1,110 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "icon": "external link", "includeVars": true, "keepTime": true, "tags": [], "targetBlank": false, "title": "SLO overview", "type": "link", "url": "/d/blog-slo-overview" },
+    { "icon": "external link", "includeVars": true, "keepTime": true, "tags": [], "targetBlank": false, "title": "Platform overview", "type": "link", "url": "/d/blog-platform-overview" }
+  ],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Five-minute successful-probe ratio for the selected read-only journey.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 1, "max": 1, "min": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 0.95 }, { "color": "green", "value": 0.99 }] }, "unit": "percentunit" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "blog:synthetic_probe_success:ratio5m{journey=\"$journey\"}", "instant": true, "legendFormat": "Success", "range": false, "refId": "A" }],
+      "title": "5-Minute Journey Availability",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Latest end-to-end duration observed from Blackbox Exporter.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 3, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 }] }, "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "probe_duration_seconds{job=\"synthetic-http\",journey=\"$journey\"}", "instant": true, "legendFormat": "Duration", "range": false, "refId": "A" }],
+      "title": "Latest Probe Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Latest HTTP response status. A zero usually means the connection failed before an HTTP response arrived.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 200 }, { "color": "red", "value": 300 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "probe_http_status_code{job=\"synthetic-http\",journey=\"$journey\"}", "instant": true, "legendFormat": "HTTP", "range": false, "refId": "A" }],
+      "title": "HTTP Status",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Separates a monitoring-system failure from an application journey failure.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "decimals": 0, "max": 1, "min": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value_and_name", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "up{job=\"blackbox-exporter\"}", "instant": true, "legendFormat": "Exporter", "range": false, "refId": "A" }],
+      "title": "Probe Engine Health",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Probe success and duration over time. Use this before pivoting into service metrics, traces, and logs.",
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "lineInterpolation": "linear", "lineWidth": 2, "pointSize": 5, "showPoints": "never", "spanNulls": false, "stacking": { "group": "A", "mode": "none" } }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 5 },
+      "id": 5,
+      "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "editorMode": "code", "expr": "probe_success{job=\"synthetic-http\",journey=\"$journey\"}", "legendFormat": "success", "range": true, "refId": "A" },
+        { "editorMode": "code", "expr": "probe_duration_seconds{job=\"synthetic-http\",journey=\"$journey\"}", "legendFormat": "duration seconds", "range": true, "refId": "B" }
+      ],
+      "title": "Synthetic Journey History",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Firing synthetic or probe-engine alerts. Follow the Phase 9 runbook before changing the application.",
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 5 },
+      "id": 6,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto", "wideLayout": true },
+      "targets": [{ "editorMode": "code", "expr": "sum(ALERTS{alertstate=\"firing\",alertname=~\"BlogSynthetic.*|BlackboxExporterDown\"}) or vector(0)", "instant": true, "legendFormat": "Firing", "range": false, "refId": "A" }],
+      "title": "Firing Synthetic Alerts",
+      "type": "stat"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 41,
+  "tags": ["blog-platform", "synthetic", "readiness"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "definition": "label_values(probe_success{job=\"synthetic-http\"}, journey)",
+        "includeAll": false,
+        "label": "Journey",
+        "name": "journey",
+        "options": [],
+        "query": { "query": "label_values(probe_success{job=\"synthetic-http\"}, journey)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Blog Platform - Synthetic Readiness",
+  "uid": "blog-synthetic-readiness",
+  "version": 1,
+  "weekStart": ""
+}

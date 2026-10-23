@@ -98,6 +98,10 @@ spec:
               mountPath: /etc/prometheus/rules/blog-platform.yml
               subPath: blog-platform.yml
               readOnly: true
+            - name: prometheus-config
+              mountPath: /etc/prometheus/targets/synthetic-targets.yml
+              subPath: synthetic-targets.yml
+              readOnly: true
             - name: prometheus-data
               mountPath: /prometheus
       volumes:

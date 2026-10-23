@@ -1,0 +1,73 @@
+rule_files:
+  - blog-platform.yml
+
+evaluation_interval: 30s
+group_eval_order:
+  - blog-platform-synthetic-recording
+  - blog-platform-synthetic-alerts
+
+tests:
+  - name: sustained failed probe pages the owning team
+    interval: 30s
+    input_series:
+      - series: 'probe_success{job="synthetic-http",journey="frontend-home",service="frontend",instance="http://frontend:80/"}'
+        values: '0x10'
+
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: BlogSyntheticProbeFailed
+        exp_alerts:
+          - exp_labels:
+              instance: http://frontend:80/
+              job: synthetic-http
+              journey: frontend-home
+              severity: critical
+              team: platform
+              service: frontend
+            exp_annotations:
+              summary: "Synthetic journey frontend-home is failing"
+              description: "The private probe for http://frontend:80/ has failed continuously for two minutes."
+              runbook: docs/observability-phase-9.md#synthetic-probe-failed
+
+  - name: slow probes warn only after a sustained breach
+    interval: 30s
+    input_series:
+      - series: 'probe_duration_seconds{job="synthetic-http",journey="public-post-list",service="api-gateway",instance="http://api-gateway:9090/api/posts?pageNo=0&pageSize=1"}'
+        values: '3x30'
+
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: BlogSyntheticProbeSlow
+        exp_alerts:
+          - exp_labels:
+              instance: http://api-gateway:9090/api/posts?pageNo=0&pageSize=1
+              job: synthetic-http
+              journey: public-post-list
+              severity: warning
+              team: platform
+              service: api-gateway
+            exp_annotations:
+              summary: "Synthetic journey public-post-list is slow"
+              description: "The five-minute average probe duration for http://api-gateway:9090/api/posts?pageNo=0&pageSize=1 has exceeded two seconds for ten minutes."
+              runbook: docs/observability-phase-9.md#synthetic-probe-slow
+
+  - name: exporter failure is distinguishable from application failure
+    interval: 30s
+    input_series:
+      - series: 'up{job="blackbox-exporter",instance="blackbox-exporter:9115"}'
+        values: '0x10'
+
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: BlackboxExporterDown
+        exp_alerts:
+          - exp_labels:
+              instance: blackbox-exporter:9115
+              job: blackbox-exporter
+              severity: critical
+              team: platform
+              service: blackbox-exporter
+            exp_annotations:
+              summary: "Blackbox Exporter is not reachable"
+              description: "Prometheus has been unable to scrape Blackbox Exporter for more than two minutes, so synthetic results are not trustworthy."
+              runbook: docs/observability-phase-9.md#blackbox-exporter-down

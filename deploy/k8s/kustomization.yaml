@@ -9,6 +9,7 @@ resources:
   - applications.yaml
   - frontend.yaml
   - prometheus.yaml
+  - synthetics.yaml
   - grafana.yaml
   - alertmanager.yaml
   - logging.yaml
@@ -18,6 +19,10 @@ configMapGenerator:
     files:
       - prometheus/prometheus.yml
       - prometheus/blog-platform.yml
+      - synthetic-targets.yml=prometheus/targets/synthetic-targets.yml
+  - name: blackbox-config
+    files:
+      - blackbox.yml=synthetics/blackbox.yml
   - name: grafana-provisioning
     files:
       - prometheus.yml=grafana/provisioning/datasources/prometheus.yml
@@ -29,6 +34,7 @@ configMapGenerator:
       - grafana/dashboards/event-pipeline.json
       - grafana/dashboards/service-detail.json
       - grafana/dashboards/slo-overview.json
+      - grafana/dashboards/synthetic-readiness.json
   - name: alertmanager-config
     files:
       - alertmanager.yml=alertmanager/alertmanager.yml

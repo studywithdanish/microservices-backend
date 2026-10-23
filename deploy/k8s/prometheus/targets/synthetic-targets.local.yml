@@ -1,0 +1,13 @@
+- targets:
+    - http://api-gateway:9090/actuator/health
+  labels:
+    module: spring_health
+    journey: gateway-health
+    service: api-gateway
+
+- targets:
+    - http://api-gateway:9090/api/posts?pageNo=0&pageSize=1
+  labels:
+    module: http_2xx
+    journey: public-post-list
+    service: api-gateway

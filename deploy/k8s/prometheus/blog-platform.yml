@@ -133,6 +133,54 @@ groups:
           description: "Alertmanager has rejected its current configuration for at least five minutes."
           runbook: docs/observability-phase-4.md#configuration-reload-failure
 
+  - name: blog-platform-synthetic-recording
+    interval: 30s
+    rules:
+      - record: blog:synthetic_probe_success:ratio5m
+        expr: avg_over_time(probe_success{job="synthetic-http"}[5m])
+
+      - record: blog:synthetic_probe_duration:avg5m
+        expr: avg_over_time(probe_duration_seconds{job="synthetic-http"}[5m])
+
+  - name: blog-platform-synthetic-alerts
+    interval: 30s
+    rules:
+      - alert: BlogSyntheticProbeFailed
+        expr: probe_success{job="synthetic-http"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Synthetic journey {{ $labels.journey }} is failing"
+          description: "The private probe for {{ $labels.instance }} has failed continuously for two minutes."
+          runbook: docs/observability-phase-9.md#synthetic-probe-failed
+
+      - alert: BlogSyntheticProbeSlow
+        expr: blog:synthetic_probe_duration:avg5m > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+          service: "{{ $labels.service }}"
+        annotations:
+          summary: "Synthetic journey {{ $labels.journey }} is slow"
+          description: "The five-minute average probe duration for {{ $labels.instance }} has exceeded two seconds for ten minutes."
+          runbook: docs/observability-phase-9.md#synthetic-probe-slow
+
+      - alert: BlackboxExporterDown
+        expr: up{job="blackbox-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+          service: blackbox-exporter
+        annotations:
+          summary: "Blackbox Exporter is not reachable"
+          description: "Prometheus has been unable to scrape Blackbox Exporter for more than two minutes, so synthetic results are not trustworthy."
+          runbook: docs/observability-phase-9.md#blackbox-exporter-down
+
   - name: blog-platform-slo-recording
     interval: 30s
     rules:

@@ -135,6 +135,10 @@ spec:
               mountPath: /etc/grafana/dashboards/slo-overview.json
               subPath: slo-overview.json
               readOnly: true
+            - name: grafana-dashboards
+              mountPath: /etc/grafana/dashboards/synthetic-readiness.json
+              subPath: synthetic-readiness.json
+              readOnly: true
       volumes:
         - name: grafana-data
           persistentVolumeClaim:

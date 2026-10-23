@@ -1,6 +1,6 @@
 # Local Kubernetes Runbook
 
-This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Grafana, Tempo, OpenTelemetry Collector, Alertmanager, Elasticsearch, Kibana, Filebeat, and local Mailpit inbox remain cluster-internal.
+This directory deploys the complete platform to a dedicated local Minikube profile. It keeps the frontend and API Gateway public while the Identity, Post, Content, MySQL, Kafka, Prometheus, Blackbox Exporter, Grafana, Tempo, OpenTelemetry Collector, Alertmanager, Elasticsearch, Kibana, Filebeat, and local Mailpit inbox remain cluster-internal.
 
 ## Prerequisites
 
@@ -37,7 +37,7 @@ The script performs these steps:
 1. Builds the five active Spring Boot service images and the React/Nginx image.
 2. Loads all images into the selected Minikube profile.
 3. Generates a Kubernetes Secret only when one does not already exist.
-4. Deploys four MySQL StatefulSets, Kafka, Prometheus, Grafana, Tempo, OpenTelemetry Collector, Alertmanager, Elasticsearch, Kibana, Filebeat, and Mailpit with persistent state where required.
+4. Deploys four MySQL StatefulSets, Kafka, Prometheus, Blackbox Exporter, Grafana, Tempo, OpenTelemetry Collector, Alertmanager, Elasticsearch, Kibana, Filebeat, and Mailpit with persistent state where required.
 5. Waits for the databases and Kafka before deploying the services, gateway, and frontend.
 6. Waits until every application Deployment is available.
 
@@ -84,9 +84,17 @@ $encoded = kubectl -n blog-platform get secret blog-secrets -o jsonpath="{.data.
 [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))
 ```
 
-Sign in with user `admin`. The **Blog Platform** folder contains the overview, event-pipeline, service-detail, and SLO/error-budget dashboards.
+Sign in with user `admin`. The **Blog Platform** folder contains the overview, event-pipeline, service-detail, SLO/error-budget, and synthetic-readiness dashboards.
 
 The SLO dashboard evaluates 99.5% availability and 95% of requests under two seconds over a rolling 30-day window. See `docs/observability-phase-8.md` for burn-rate alerts and the incident workflow.
+
+Blackbox Exporter continuously checks three private, read-only journeys. With Prometheus, Grafana, Elasticsearch, and Tempo port-forwards active, run the complete readiness gate:
+
+```powershell
+.\deploy\k8s\scripts\verify-operational-readiness.ps1 -Profile blog-platform
+```
+
+See `docs/observability-phase-9.md` for probe queries, the controlled failure drill, incident runbooks, and production backup/restore evidence requirements.
 
 Tempo is internal. Grafana already queries it, but direct diagnostics can use a temporary port-forward:
 
