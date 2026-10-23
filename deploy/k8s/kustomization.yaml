@@ -28,6 +28,7 @@ configMapGenerator:
       - grafana/dashboards/platform-overview.json
       - grafana/dashboards/event-pipeline.json
       - grafana/dashboards/service-detail.json
+      - grafana/dashboards/slo-overview.json
   - name: alertmanager-config
     files:
       - alertmanager.yml=alertmanager/alertmanager.yml

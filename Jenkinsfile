@@ -184,6 +184,7 @@ void validatePrometheusConfiguration() {
 
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check config /etc/prometheus/prometheus.yml")
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check rules /etc/prometheus/blog-platform.yml")
+    runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} test rules /etc/prometheus/slo-rules.test.yml")
 }
 
 void validateAlertmanagerConfiguration() {

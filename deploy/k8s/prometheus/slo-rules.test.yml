@@ -1,0 +1,111 @@
+rule_files:
+  - blog-platform.yml
+
+evaluation_interval: 1m
+fuzzy_compare: true
+group_eval_order:
+  - blog-platform-slo-recording
+  - blog-platform-slo-alerts
+
+tests:
+  - name: sustained errors and slow requests consume both budgets
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="api-gateway",method="GET",status="200",uri="/api/posts"}'
+        values: '0+90x80'
+      - series: 'http_server_requests_seconds_count{application="api-gateway",method="GET",status="500",uri="/api/posts"}'
+        values: '0+10x80'
+      - series: 'http_server_requests_seconds_bucket{application="api-gateway",method="GET",status="200",uri="/api/posts",le="2.0"}'
+        values: '0+10x80'
+
+    promql_expr_test:
+      - expr: blog:slo_http_availability:ratio30d
+        eval_time: 70m
+        exp_samples:
+          - labels: 'blog:slo_http_availability:ratio30d{application="api-gateway",objective="0.995",window="30d"}'
+            value: 0.9
+
+      - expr: blog:slo_http_availability:error_budget_remaining30d
+        eval_time: 70m
+        exp_samples:
+          - labels: 'blog:slo_http_availability:error_budget_remaining30d{application="api-gateway",objective="0.995",window="30d"}'
+            value: 0
+
+      - expr: blog:slo_http_latency:ratio30d
+        eval_time: 70m
+        exp_samples:
+          - labels: 'blog:slo_http_latency:ratio30d{application="api-gateway",objective="0.95",threshold="2s",window="30d"}'
+            value: 0.09999999999999998
+
+      - expr: blog:slo_http_latency:error_budget_remaining30d
+        eval_time: 70m
+        exp_samples:
+          - labels: 'blog:slo_http_latency:error_budget_remaining30d{application="api-gateway",objective="0.95",threshold="2s",window="30d"}'
+            value: 0
+
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: BlogAvailabilitySloFastBurn
+        exp_alerts:
+          - exp_labels:
+              application: api-gateway
+              severity: critical
+              team: backend
+              service: api-gateway
+              slo: availability
+            exp_annotations:
+              summary: "Availability error budget is burning rapidly for api-gateway"
+              description: "The 99.5% availability SLO is burning faster than 14.4x in both the 5-minute and 1-hour windows."
+              runbook: docs/observability-phase-8.md#fast-burn-availability-or-latency
+
+      - eval_time: 70m
+        alertname: BlogLatencySloFastBurn
+        exp_alerts:
+          - exp_labels:
+              application: api-gateway
+              severity: critical
+              team: backend
+              service: api-gateway
+              slo: latency
+            exp_annotations:
+              summary: "Latency error budget is burning rapidly for api-gateway"
+              description: "The 95% under two seconds latency SLO is burning faster than 14.4x in both the 5-minute and 1-hour windows."
+              runbook: docs/observability-phase-8.md#fast-burn-availability-or-latency
+
+  - name: low traffic guard suppresses fast-burn paging
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="content-service",method="GET",status="500",uri="/api/categories"}'
+        values: '0+0.1x80'
+      - series: 'http_server_requests_seconds_bucket{application="content-service",method="GET",status="500",uri="/api/categories",le="2.0"}'
+        values: '0+0x80'
+
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: BlogAvailabilitySloFastBurn
+        exp_alerts: []
+
+      - eval_time: 70m
+        alertname: BlogLatencySloFastBurn
+        exp_alerts: []
+
+  - name: healthy traffic without a 5xx series reports full availability
+    interval: 1m
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="identity-service",method="POST",status="200",uri="/api/v1/auth/login"}'
+        values: '0+60x80'
+      - series: 'http_server_requests_seconds_bucket{application="identity-service",method="POST",status="200",uri="/api/v1/auth/login",le="2.0"}'
+        values: '0+60x80'
+
+    promql_expr_test:
+      - expr: blog:slo_http_availability:ratio30d
+        eval_time: 70m
+        exp_samples:
+          - labels: 'blog:slo_http_availability:ratio30d{application="identity-service",objective="0.995",window="30d"}'
+            value: 1
+
+      - expr: blog:slo_http_availability:error_budget_remaining30d
+        eval_time: 70m
+        exp_samples:
+          - labels: 'blog:slo_http_availability:error_budget_remaining30d{application="identity-service",objective="0.995",window="30d"}'
+            value: 1

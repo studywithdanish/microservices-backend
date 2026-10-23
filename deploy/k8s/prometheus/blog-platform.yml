@@ -132,3 +132,141 @@ groups:
           summary: "Alertmanager configuration reload failed"
           description: "Alertmanager has rejected its current configuration for at least five minutes."
           runbook: docs/observability-phase-4.md#configuration-reload-failure
+
+  - name: blog-platform-slo-recording
+    interval: 30s
+    rules:
+      - record: blog:slo_http_requests:rate5m
+        expr: sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*|UNKNOWN"}[5m]))
+
+      - record: blog:slo_http_errors:ratio5m
+        expr: (sum by (application) (rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*|UNKNOWN"}[5m])) or on (application) (0 * blog:slo_http_requests:rate5m)) / clamp_min(blog:slo_http_requests:rate5m, 0.001)
+
+      - record: blog:slo_http_slow:ratio5m
+        expr: 1 - (sum by (application) (rate(http_server_requests_seconds_bucket{le="2.0",uri!~"/actuator.*|UNKNOWN"}[5m])) / clamp_min(blog:slo_http_requests:rate5m, 0.001))
+
+      - record: blog:slo_http_requests:rate30m
+        expr: sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*|UNKNOWN"}[30m]))
+
+      - record: blog:slo_http_errors:ratio30m
+        expr: (sum by (application) (rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*|UNKNOWN"}[30m])) or on (application) (0 * blog:slo_http_requests:rate30m)) / clamp_min(blog:slo_http_requests:rate30m, 0.001)
+
+      - record: blog:slo_http_slow:ratio30m
+        expr: 1 - (sum by (application) (rate(http_server_requests_seconds_bucket{le="2.0",uri!~"/actuator.*|UNKNOWN"}[30m])) / clamp_min(blog:slo_http_requests:rate30m, 0.001))
+
+      - record: blog:slo_http_requests:rate1h
+        expr: sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*|UNKNOWN"}[1h]))
+
+      - record: blog:slo_http_errors:ratio1h
+        expr: (sum by (application) (rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*|UNKNOWN"}[1h])) or on (application) (0 * blog:slo_http_requests:rate1h)) / clamp_min(blog:slo_http_requests:rate1h, 0.001)
+
+      - record: blog:slo_http_slow:ratio1h
+        expr: 1 - (sum by (application) (rate(http_server_requests_seconds_bucket{le="2.0",uri!~"/actuator.*|UNKNOWN"}[1h])) / clamp_min(blog:slo_http_requests:rate1h, 0.001))
+
+      - record: blog:slo_http_requests:rate6h
+        expr: sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*|UNKNOWN"}[6h]))
+
+      - record: blog:slo_http_errors:ratio6h
+        expr: (sum by (application) (rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*|UNKNOWN"}[6h])) or on (application) (0 * blog:slo_http_requests:rate6h)) / clamp_min(blog:slo_http_requests:rate6h, 0.001)
+
+      - record: blog:slo_http_slow:ratio6h
+        expr: 1 - (sum by (application) (rate(http_server_requests_seconds_bucket{le="2.0",uri!~"/actuator.*|UNKNOWN"}[6h])) / clamp_min(blog:slo_http_requests:rate6h, 0.001))
+
+      - record: blog:slo_http_requests:rate3d
+        expr: sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*|UNKNOWN"}[3d]))
+
+      - record: blog:slo_http_errors:ratio3d
+        expr: (sum by (application) (rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*|UNKNOWN"}[3d])) or on (application) (0 * blog:slo_http_requests:rate3d)) / clamp_min(blog:slo_http_requests:rate3d, 0.001)
+
+      - record: blog:slo_http_slow:ratio3d
+        expr: 1 - (sum by (application) (rate(http_server_requests_seconds_bucket{le="2.0",uri!~"/actuator.*|UNKNOWN"}[3d])) / clamp_min(blog:slo_http_requests:rate3d, 0.001))
+
+      - record: blog:slo_http_requests:rate30d
+        expr: sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*|UNKNOWN"}[30d]))
+
+      - record: blog:slo_http_errors:ratio30d
+        expr: (sum by (application) (rate(http_server_requests_seconds_count{status=~"5..",uri!~"/actuator.*|UNKNOWN"}[30d])) or on (application) (0 * blog:slo_http_requests:rate30d)) / clamp_min(blog:slo_http_requests:rate30d, 0.001)
+
+      - record: blog:slo_http_slow:ratio30d
+        expr: 1 - (sum by (application) (rate(http_server_requests_seconds_bucket{le="2.0",uri!~"/actuator.*|UNKNOWN"}[30d])) / clamp_min(blog:slo_http_requests:rate30d, 0.001))
+
+      - record: blog:slo_http_availability:ratio30d
+        labels:
+          objective: "0.995"
+          window: 30d
+        expr: 1 - blog:slo_http_errors:ratio30d
+
+      - record: blog:slo_http_availability:error_budget_remaining30d
+        labels:
+          objective: "0.995"
+          window: 30d
+        expr: clamp_max(clamp_min((blog:slo_http_availability:ratio30d - 0.995) / 0.005, 0), 1)
+
+      - record: blog:slo_http_latency:ratio30d
+        labels:
+          objective: "0.95"
+          threshold: 2s
+          window: 30d
+        expr: 1 - blog:slo_http_slow:ratio30d
+
+      - record: blog:slo_http_latency:error_budget_remaining30d
+        labels:
+          objective: "0.95"
+          threshold: 2s
+          window: 30d
+        expr: clamp_max(clamp_min((blog:slo_http_latency:ratio30d - 0.95) / 0.05, 0), 1)
+
+  - name: blog-platform-slo-alerts
+    interval: 30s
+    rules:
+      - alert: BlogAvailabilitySloFastBurn
+        expr: (blog:slo_http_errors:ratio5m / 0.005 > 14.4) and on (application) (blog:slo_http_errors:ratio1h / 0.005 > 14.4) and on (application) (blog:slo_http_requests:rate1h > 0.01)
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          service: "{{ $labels.application }}"
+          slo: availability
+        annotations:
+          summary: "Availability error budget is burning rapidly for {{ $labels.application }}"
+          description: "The 99.5% availability SLO is burning faster than 14.4x in both the 5-minute and 1-hour windows."
+          runbook: docs/observability-phase-8.md#fast-burn-availability-or-latency
+
+      - alert: BlogAvailabilitySloSlowBurn
+        expr: (blog:slo_http_errors:ratio6h / 0.005 > 1) and on (application) (blog:slo_http_errors:ratio3d / 0.005 > 1) and on (application) (blog:slo_http_requests:rate6h > 0.01)
+        for: 15m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.application }}"
+          slo: availability
+        annotations:
+          summary: "Availability error budget is burning persistently for {{ $labels.application }}"
+          description: "The 99.5% availability SLO is burning above its sustainable rate in both the 6-hour and 3-day windows."
+          runbook: docs/observability-phase-8.md#slow-burn-availability-or-latency
+
+      - alert: BlogLatencySloFastBurn
+        expr: (blog:slo_http_slow:ratio5m / 0.05 > 14.4) and on (application) (blog:slo_http_slow:ratio1h / 0.05 > 14.4) and on (application) (blog:slo_http_requests:rate1h > 0.01)
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+          service: "{{ $labels.application }}"
+          slo: latency
+        annotations:
+          summary: "Latency error budget is burning rapidly for {{ $labels.application }}"
+          description: "The 95% under two seconds latency SLO is burning faster than 14.4x in both the 5-minute and 1-hour windows."
+          runbook: docs/observability-phase-8.md#fast-burn-availability-or-latency
+
+      - alert: BlogLatencySloSlowBurn
+        expr: (blog:slo_http_slow:ratio6h / 0.05 > 1) and on (application) (blog:slo_http_slow:ratio3d / 0.05 > 1) and on (application) (blog:slo_http_requests:rate6h > 0.01)
+        for: 15m
+        labels:
+          severity: warning
+          team: backend
+          service: "{{ $labels.application }}"
+          slo: latency
+        annotations:
+          summary: "Latency error budget is burning persistently for {{ $labels.application }}"
+          description: "The 95% under two seconds latency SLO is burning above its sustainable rate in both the 6-hour and 3-day windows."
+          runbook: docs/observability-phase-8.md#slow-burn-availability-or-latency

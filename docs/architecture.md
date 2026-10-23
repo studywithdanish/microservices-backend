@@ -25,7 +25,7 @@ flowchart LR
         Post -.->|Category reference lookup<br/>internal service token| Content
         Content -.->|Post reference validation<br/>internal service token| Post
 
-        Prometheus[(Prometheus<br/>15-day TSDB)] -.->|scrape internal metrics| Gateway
+        Prometheus[(Prometheus<br/>35-day TSDB)] -.->|scrape internal metrics| Gateway
         Prometheus -.->|scrape internal metrics| Identity
         Prometheus -.->|scrape internal metrics| Post
         Prometheus -.->|scrape internal metrics| Content
@@ -124,7 +124,7 @@ sequenceDiagram
 ## Metrics Observability
 
 - Each service exposes Prometheus-format JVM, HTTP, database-pool, Kafka, and bounded business metrics on its private `/actuator/prometheus` endpoint.
-- Prometheus scrapes the five active services every 15 seconds and retains time-series data for 15 days by default.
+- Prometheus scrapes the five active services every 15 seconds and retains time-series data for 35 days by default so the rolling 30-day SLO window is complete.
 - Recording rules precompute request rate, HTTP 5xx ratio, p95 latency, and outbox backlog queries.
 - Alert rules detect service scrape failure, elevated errors or latency, event publication failures, dead-letter events, and Prometheus rule failures.
 - Prometheus is available on port `9096` for local development, loopback-only through an SSH tunnel in production Compose, and through a temporary port-forward in Kubernetes.
@@ -148,6 +148,16 @@ sequenceDiagram
 - Post Service stores `traceparent` and `tracestate` beside each outbox event; the relay restores the parent before Kafka observation injects message headers.
 - Local environments sample all requests for demonstrations. Production Compose defaults to ten percent and can be tuned with `TRACING_SAMPLING_PROBABILITY`.
 - Tempo uses local persistent storage only for local and portfolio environments; a real production deployment requires authenticated private access and replicated object storage.
+
+## SLO and error-budget workflow
+
+- Availability is the ratio of non-5xx business HTTP responses over a rolling 30-day window, with a 99.5% objective.
+- Latency is the ratio of business HTTP responses completed within two seconds over a rolling 30-day window, with a 95% objective.
+- Actuator traffic and unmatched `UNKNOWN` routes are excluded from both indicators.
+- Prometheus recording rules calculate the SLI, remaining budget, and short/long burn rates per application.
+- Fast burns must breach both 5-minute and 1-hour windows before routing a critical page; persistent burns must breach both 6-hour and 3-day windows before routing a warning.
+- Grafana provisions the SLO dashboard from Git, and responders pivot from budget impact to service metrics, Tempo traces, and Kibana logs.
+- Objectives and alert thresholds are operational policy and should be reviewed against real traffic before an external production commitment.
 
 ## Correlation workflow
 

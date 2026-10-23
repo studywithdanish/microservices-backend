@@ -223,13 +223,19 @@ class ApiGatewayRoutingTest {
                 .extracting(endpoint -> endpoint.getEndpointId().toString())
                 .contains("prometheus");
         webTestClient.get()
+                .uri("/actuator/health")
+                .exchange()
+                .expectStatus().isOk();
+        webTestClient.get()
                 .uri("/actuator/prometheus")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(String.class)
                 .value(body -> org.assertj.core.api.Assertions.assertThat(body)
                         .contains("jvm_memory_used_bytes")
-                        .contains("application=\"api-gateway\""));
+                        .contains("application=\"api-gateway\"")
+                        .contains("http_server_requests_seconds_bucket")
+                        .contains("le=\"2.0\""));
     }
 
     @Test

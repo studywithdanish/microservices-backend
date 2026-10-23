@@ -20,7 +20,7 @@ Prometheus reaches `/actuator/prometheus` over the private Docker or Kubernetes 
 - Scrape timeout: 10 seconds
 - Rule evaluation interval: 15 seconds
 - Local UI port: `9096`
-- Default retention: 15 days, configurable with `PROMETHEUS_RETENTION`
+- Default retention: 35 days, configurable with `PROMETHEUS_RETENTION`, so the Phase 8 rolling 30-day SLO window has complete local history
 - Persistent storage: Docker named volume or Kubernetes `5Gi` persistent-volume claim
 - Image: `prom/prometheus:v3.15.0`, pinned for repeatable builds
 
