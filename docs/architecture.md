@@ -32,6 +32,9 @@ flowchart LR
         Prometheus -.->|scrape internal metrics| Notification
         Grafana[Grafana<br/>operator dashboards] -->|PromQL| Prometheus
         Prometheus -->|firing/resolved alerts| Alertmanager[Alertmanager<br/>routing and silences]
+        Prometheus -->|multi-target scrape| Blackbox[Blackbox Exporter<br/>read-only probes]
+        Blackbox -.->|health and public API| Gateway
+        Blackbox -.->|home page| FrontendProbe[React/Nginx service]
         Alertmanager -->|local SMTP| Mailpit[Mailpit<br/>operator inbox]
         Gateway -.->|ECS JSON stdout| Filebeat[Filebeat]
         Identity -.->|ECS JSON stdout| Filebeat
@@ -125,10 +128,11 @@ sequenceDiagram
 
 - Each service exposes Prometheus-format JVM, HTTP, database-pool, Kafka, and bounded business metrics on its private `/actuator/prometheus` endpoint.
 - Prometheus scrapes the five active services every 15 seconds and retains time-series data for 35 days by default so the rolling 30-day SLO window is complete.
+- Blackbox Exporter checks gateway health, a public post read, and the frontend every 30 seconds from inside the deployment network without creating application data.
 - Recording rules precompute request rate, HTTP 5xx ratio, p95 latency, and outbox backlog queries.
 - Alert rules detect service scrape failure, elevated errors or latency, event publication failures, dead-letter events, and Prometheus rule failures.
 - Prometheus is available on port `9096` for local development, loopback-only through an SSH tunnel in production Compose, and through a temporary port-forward in Kubernetes.
-- Grafana is provisioned from Git with platform overview, Kafka/outbox, and per-service JVM/database dashboards.
+- Grafana is provisioned from Git with platform overview, Kafka/outbox, per-service JVM/database, SLO, and synthetic-readiness dashboards.
 - Grafana is available on port `3001` for local development and only through an SSH tunnel or Kubernetes port-forward in production-style environments.
 - Alertmanager groups, deduplicates, inhibits, silences, and routes Prometheus alerts by severity. Critical notifications repeat more frequently than warnings.
 - Mailpit captures local email delivery for deterministic testing; production uses an authenticated external SMTP relay with its password mounted from a secret file.
@@ -158,6 +162,16 @@ sequenceDiagram
 - Fast burns must breach both 5-minute and 1-hour windows before routing a critical page; persistent burns must breach both 6-hour and 3-day windows before routing a warning.
 - Grafana provisions the SLO dashboard from Git, and responders pivot from budget impact to service metrics, Tempo traces, and Kibana logs.
 - Objectives and alert thresholds are operational policy and should be reviewed against real traffic before an external production commitment.
+
+## Synthetic and operational-readiness workflow
+
+- Prometheus uses the multi-target exporter pattern to ask Blackbox Exporter to probe three internal URLs with either an HTTP 2xx or Spring-health-body module.
+- `probe_success`, HTTP status, and end-to-end duration show whether a user-visible path is reachable even when application metric endpoints remain healthy.
+- Separate alerts distinguish a failed journey from an unavailable probe engine and avoid false attribution.
+- A controlled local drill scales the frontend down, waits for the alert, and restores the original replicas in a `finally` block.
+- A read-only gate checks workload readiness, bound storage, synthetic results, rule evaluation, metric/log retention, and Tempo readiness.
+- Production promotion additionally requires environment-owned backup and restore evidence; repository configuration alone cannot prove a cloud restore.
+- Internal probes do not cover public DNS, TLS, CDN, WAF, or internet routing, so production should add a separately hosted public-HTTPS probe.
 
 ## Correlation workflow
 

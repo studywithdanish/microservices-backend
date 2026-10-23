@@ -1,6 +1,6 @@
 # Production Deployment Runbook
 
-This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
+This runbook deploys the API Gateway, Identity Service, Post Service, Content Service, Notification Service, Kafka, Prometheus, Blackbox Exporter, Grafana, Alertmanager, Elasticsearch, Kibana, Filebeat, frontend, four MySQL databases, and Caddy reverse proxy on one AWS Lightsail or EC2 Ubuntu server.
 
 The first deployment uses one public origin:
 
@@ -22,7 +22,8 @@ Caddy manages HTTPS certificates automatically. API traffic passes through the g
 /api/notifications/**  -> API Gateway -> Notification Service -> Notification MySQL
 PostPublished          -> Post Service -> Kafka -> Notification Service
 internal metrics      -> Prometheus -> persistent 35-day time series and SLO rules
-operator dashboards   -> Grafana -> Prometheus queries and error budgets
+read-only journeys    -> Blackbox Exporter -> Prometheus probe metrics
+operator dashboards   -> Grafana -> metrics, error budgets, and synthetic readiness
 evaluated alerts      -> Alertmanager -> external SMTP -> operators
 structured stdout     -> Filebeat -> Elasticsearch -> Kibana Discover
 /actuator/health      -> API Gateway health endpoint
@@ -165,6 +166,7 @@ docker compose -f docker-compose.prod.yml --env-file .env logs -f notification-s
 docker compose -f docker-compose.prod.yml --env-file .env logs -f kafka
 docker compose -f docker-compose.prod.yml --env-file .env logs -f gateway
 docker compose -f docker-compose.prod.yml --env-file .env logs -f prometheus
+docker compose -f docker-compose.prod.yml --env-file .env logs -f blackbox-exporter
 docker compose -f docker-compose.prod.yml --env-file .env logs -f grafana
 docker compose -f docker-compose.prod.yml --env-file .env logs -f alertmanager
 docker compose -f docker-compose.prod.yml --env-file .env logs -f reverse-proxy
@@ -184,7 +186,7 @@ Grafana is also excluded from Caddy and binds to server loopback. Open a second 
 ssh -L 13001:127.0.0.1:3001 user@your-server
 ```
 
-Open `http://localhost:13001`, sign in with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`, and inspect the provisioned **Blog Platform** dashboards, including the SLO/error-budget overview. Do not open port `3001` in the cloud firewall.
+Open `http://localhost:13001`, sign in with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`, and inspect the provisioned **Blog Platform** dashboards, including the SLO/error-budget and synthetic-readiness views. Do not open port `3001` in the cloud firewall.
 
 Alertmanager is also loopback-only. Open another authenticated tunnel when managing alerts or silences:
 
@@ -266,7 +268,7 @@ Keep the DNS records in DNS-only mode while Caddy issues certificates directly f
 
 ## 10. Interview Explanation
 
-I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists 35 days of time-series data, evaluates latency, error, availability, outbox, and dead-letter alerts, and calculates rolling availability and latency SLOs with error budgets. Grafana is provisioned from Git with platform, event-pipeline, per-service, and SLO dashboards. Alertmanager groups, deduplicates, inhibits, and routes both threshold and multi-window burn-rate alerts through authenticated SMTP. Spring Boot emits ECS JSON logs, Filebeat ships only opted-in application workloads, Elasticsearch applies 14-day retention, and Kibana provides centralized investigation. Operator interfaces are available only through SSH tunnels. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables or mounted secret files. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Filebeat, uploaded-image, and TLS data use persistent Docker volumes. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
+I deployed the project as a Docker Compose stack on one AWS server. Caddy terminates HTTPS and the API Gateway provides a stable routing boundary. Identity, Posts, Content, and Notifications are independently owned across four services and databases. Post Service uses a transactional outbox to publish versioned events to Kafka; Notification Service consumes them idempotently with retry and dead-letter handling. Prometheus privately scrapes each service, persists 35 days of time-series data, evaluates latency, error, availability, outbox, and dead-letter alerts, and calculates rolling availability and latency SLOs with error budgets. Blackbox Exporter runs read-only health, public-API, and frontend journeys so a user-visible path can fail independently of the service metrics endpoint. Grafana is provisioned from Git with platform, event-pipeline, per-service, SLO, and synthetic-readiness dashboards. Alertmanager groups, deduplicates, inhibits, and routes both threshold and multi-window burn-rate alerts through authenticated SMTP. Spring Boot emits ECS JSON logs, Filebeat ships only opted-in application workloads, Elasticsearch applies 14-day retention, and Kibana provides centralized investigation. Operator interfaces are available only through SSH tunnels. Services validate JWT claims locally, use Flyway, and receive secrets through environment variables or mounted secret files. The gateway has explicit route ownership and no catch-all legacy backend. Database, Kafka, Prometheus, Grafana, Alertmanager, Elasticsearch, Filebeat, uploaded-image, and TLS data use persistent Docker volumes. Production promotion requires current backup/restore evidence; an additional separately hosted public-HTTPS probe would cover DNS, TLS, CDN, WAF, and internet routing. I avoided EKS, RDS, NAT Gateways, and load balancers for the first portfolio deployment to control cost while keeping the architecture ready for later automation.
 
 ## 11. Switching From IP Smoke Test To Domain
 

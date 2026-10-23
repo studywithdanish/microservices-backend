@@ -20,6 +20,7 @@ pipeline {
         FILEBEAT_IMAGE = 'docker.elastic.co/beats/filebeat:9.3.1'
         TEMPO_IMAGE = 'grafana/tempo:3.1.0'
         OTEL_COLLECTOR_IMAGE = 'otel/opentelemetry-collector-contrib:0.163.2'
+        BLACKBOX_EXPORTER_IMAGE = 'prom/blackbox-exporter:v0.28.0'
         DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
@@ -124,6 +125,8 @@ pipeline {
                     runCommand('docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production.example config --quiet')
                     runCommand('kubectl kustomize deploy/k8s')
                     validatePrometheusConfiguration()
+                    validateSyntheticMonitoringConfiguration()
+                    validateGrafanaDashboards()
                     validateAlertmanagerConfiguration()
                     validateCentralizedLoggingConfiguration()
                     validateTracingConfiguration()
@@ -185,6 +188,30 @@ void validatePrometheusConfiguration() {
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check config /etc/prometheus/prometheus.yml")
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} check rules /etc/prometheus/blog-platform.yml")
     runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} test rules /etc/prometheus/slo-rules.test.yml")
+    runCommand("docker run --rm --entrypoint promtool -v \"${configDirectory}:/etc/prometheus:ro\" ${env.PROMETHEUS_IMAGE} test rules /etc/prometheus/synthetic-rules.test.yml")
+}
+
+void validateSyntheticMonitoringConfiguration() {
+    String configDirectory = isUnix()
+            ? "${env.WORKSPACE}/deploy/k8s/synthetics"
+            : "${env.WORKSPACE}\\deploy\\k8s\\synthetics"
+
+    runCommand("docker run --rm -v \"${configDirectory}:/etc/blackbox:ro\" ${env.BLACKBOX_EXPORTER_IMAGE} --config.file=/etc/blackbox/blackbox.yml --config.check")
+}
+
+void validateGrafanaDashboards() {
+    [
+        'deploy/k8s/grafana/dashboards/platform-overview.json',
+        'deploy/k8s/grafana/dashboards/event-pipeline.json',
+        'deploy/k8s/grafana/dashboards/service-detail.json',
+        'deploy/k8s/grafana/dashboards/slo-overview.json',
+        'deploy/k8s/grafana/dashboards/synthetic-readiness.json'
+    ].each { dashboardFile ->
+        def dashboard = new groovy.json.JsonSlurperClassic().parseText(readFile(file: dashboardFile))
+        if (!dashboard.uid || !dashboard.title || !(dashboard.panels instanceof List)) {
+            error("Invalid Grafana dashboard metadata: ${dashboardFile}")
+        }
+    }
 }
 
 void validateAlertmanagerConfiguration() {

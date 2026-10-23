@@ -2,7 +2,7 @@
 
 Spring Boot microservices for a blogging platform, migrated incrementally from a monolithic API with the strangler pattern.
 
-**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and the first eight observability phases (metrics, Prometheus, Grafana, Alertmanager, centralized logging, correlation IDs, distributed tracing, and SLO automation) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
+**Status:** the five-phase core migration, Phase 6 Kafka event workflow, local full-stack integration, Jenkins CI, local Kubernetes deployment, and all nine observability phases (metrics, Prometheus, Grafana, Alertmanager, centralized logging, correlation IDs, distributed tracing, SLO automation, and operational readiness) are complete. The Post Service is S3-ready through a profile-based storage adapter, while actual AWS deployment is intentionally deferred.
 
 Companion React client: [studywithdanish/microservices-frontend](https://github.com/studywithdanish/microservices-frontend)
 
@@ -26,6 +26,9 @@ flowchart LR
     Notification --> NotificationDb[(Notification MySQL)]
     Grafana[Grafana dashboards] --> Prometheus[(Prometheus)]
     Prometheus --> Alertmanager[Alertmanager routing]
+    Prometheus --> Blackbox[Blackbox synthetic probes]
+    Blackbox -. read-only journeys .-> Gateway
+    Blackbox -. home page .-> Frontend
     Alertmanager --> Operator[Operator email]
     Filebeat[Filebeat log collector] --> Elasticsearch[(Elasticsearch logs)]
     Elasticsearch --> Kibana[Kibana Discover]
@@ -107,6 +110,7 @@ Completed improvements:
 - Propagated validated correlation IDs through the reactive gateway, servlet services, private HTTP clients, transactional outbox, Kafka records, and notification consumer MDC
 - Added Micrometer/OpenTelemetry tracing, an OTLP Collector, Tempo, Grafana trace-to-logs, service graphs, and trace continuation through the database outbox and Kafka
 - Added 30-day availability and latency SLOs, remaining error budgets, multi-window burn-rate alerts, and a provisioned Grafana SLO dashboard
+- Added private read-only synthetic journeys, probe alerts, a readiness dashboard, controlled failure drills, and evidence-based operational checks
 
 ## Documentation Map
 
@@ -127,6 +131,7 @@ Completed improvements:
 - [Observability Phase 6](docs/observability-phase-6.md) — HTTP, Reactor, MDC, outbox, Kafka correlation, Kibana searches, and incident workflow
 - [Observability Phase 7](docs/observability-phase-7.md) — OpenTelemetry instrumentation, Collector, Tempo, service graphs, trace-to-logs, sampling, and outbox/Kafka tracing
 - [Observability Phase 8](docs/observability-phase-8.md) — availability and latency SLIs, 30-day objectives, error budgets, multi-window burn alerts, and incident runbooks
+- [Observability Phase 9](docs/observability-phase-9.md) — private synthetic monitoring, readiness dashboard, controlled drills, retention checks, and backup/restore evidence
 
 ## Phase 1: Microservice-Ready Modular Monolith
 
@@ -253,6 +258,7 @@ The API Gateway exposes authenticated reads at `GET /api/notifications` and owne
 - Spring for Apache Kafka
 - AWS SDK for Java 2.x and Amazon S3
 - Prometheus 3.15
+- Prometheus Blackbox Exporter 0.28
 - Grafana 13.2
 - Alertmanager 0.34
 - Elasticsearch, Kibana, and Filebeat 9.3.1
@@ -268,7 +274,7 @@ Copy the environment template:
 cp .env.example .env
 ```
 
-Start all four databases, all four business services, Kafka, the gateway, Prometheus, Grafana, Alertmanager, the local alert inbox, Elasticsearch, Kibana, Filebeat, OpenTelemetry Collector, and Tempo:
+Start all four databases, all four business services, Kafka, the gateway, Prometheus, Blackbox Exporter, Grafana, Alertmanager, the local alert inbox, Elasticsearch, Kibana, Filebeat, OpenTelemetry Collector, and Tempo:
 
 ```bash
 docker compose up --build
@@ -300,6 +306,8 @@ Every API response returns `X-Correlation-Id`. The same value is searchable acro
 Distributed traces now connect Gateway, synchronous service calls, the transactional outbox, Kafka publication, and Notification consumption. Grafana provides trace search, service graphs, and trace-to-log links; see [Observability Phase 7](docs/observability-phase-7.md).
 
 Prometheus now measures 30-day availability and latency objectives per application. Grafana shows remaining error budgets and fast/slow burn rates, while Alertmanager routes actionable budget-consumption alerts; see [Observability Phase 8](docs/observability-phase-8.md).
+
+Blackbox Exporter now verifies gateway health, a public API read, and the React delivery path every 30 seconds without mutating data. Grafana shows journey readiness and Prometheus distinguishes application failures from probe-engine failures; see [Observability Phase 9](docs/observability-phase-9.md).
 
 Check container health status:
 
@@ -390,7 +398,7 @@ Pipeline stages:
 - Verify Java and Maven versions
 - Run legacy rollback backend plus Gateway, Identity, Post, Content, and Notification Maven tests
 - Publish JUnit test reports
-- Validate local and production Compose, Kubernetes manifests, Prometheus scrape/rule configuration, Grafana dashboard JSON, both Alertmanager routing configurations, both Filebeat collectors, and the pinned Tempo/Collector configurations
+- Validate local and production Compose, Kubernetes manifests, Prometheus scrape/rule configuration and semantic tests, Blackbox configuration, Grafana dashboard JSON, both Alertmanager routing configurations, both Filebeat collectors, and the pinned Tempo/Collector configurations
 - Package all five Spring Boot applications, including the retained rollback application
 - Build the five active service images plus the retained rollback image
 - Validate Docker Compose and Kubernetes deployment configuration
@@ -478,7 +486,7 @@ The API Gateway exposes only safe public Actuator endpoints by default:
 /actuator/info
 ```
 
-These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 35 days of data by default, covering the rolling 30-day SLO window. Grafana queries Prometheus and Tempo privately and provides authenticated metrics, SLO, service-graph, and trace views. Alertmanager receives evaluated alerts and applies grouping, inhibition, silences, and severity routing. Filebeat ships ECS JSON application logs to 14-day Elasticsearch indices, and Kibana provides the private log-investigation UI. The OpenTelemetry Collector is the private trace-ingestion boundary. None of these operator tools is embedded in the public React application.
+These endpoints report gateway health and are used for local Docker checks, CI/CD verification, and AWS or monitoring integrations. Each private service also has its own container healthcheck. Prometheus scrapes `/actuator/prometheus` only over the internal deployment network and persists 35 days of data by default, covering the rolling 30-day SLO window. Blackbox Exporter performs private, read-only gateway/API/frontend probes. Grafana queries Prometheus and Tempo privately and provides authenticated metrics, SLO, synthetic-readiness, service-graph, and trace views. Alertmanager receives evaluated alerts and applies grouping, inhibition, silences, and severity routing. Filebeat ships ECS JSON application logs to 14-day Elasticsearch indices, and Kibana provides the private log-investigation UI. The OpenTelemetry Collector is the private trace-ingestion boundary. None of these operator tools is embedded in the public React application.
 
 ## Production Readiness
 
@@ -542,6 +550,7 @@ Security-related improvements already applied:
 - Validated correlation IDs across HTTP, Reactor context, servlet MDC, outbox persistence, Kafka headers, and consumers
 - Backend-neutral OpenTelemetry tracing, Collector batching, Tempo storage, Grafana trace exploration, and outbox/Kafka trace continuation
 - Version-controlled availability and latency SLOs, error-budget calculations, multi-window burn-rate alerts, and a Grafana SLO dashboard
+- Internal synthetic endpoint monitoring, actionable probe alerts, controlled local failure drills, and a repeatable readiness gate
 
 ## Deployment Roadmap
 
@@ -560,6 +569,7 @@ The S3 application adapter is complete but deliberately inactive in the current 
 9. End-to-end correlation context across synchronous and asynchronous boundaries is complete; see `docs/observability-phase-6.md`.
 10. Distributed tracing is complete in Observability Phase 7 without coupling application code to a specific trace backend; see `docs/observability-phase-7.md`.
 11. SLO automation and error-budget alerting are complete in Observability Phase 8; see `docs/observability-phase-8.md`.
+12. Synthetic journey monitoring and operational-readiness validation are complete in Observability Phase 9; see `docs/observability-phase-9.md`.
 
 The production Docker Compose and AWS runbook are available in:
 
@@ -588,6 +598,6 @@ Implemented migration strategy:
 5. Gave every business service its own schema, Flyway history, tests, image, and CI stage.
 6. Added reliable asynchronous publication with a transactional outbox and idempotent Kafka consumer.
 
-Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, trace-tail sampling, managed Tempo/object storage, synthetic external journey monitoring, and managed-cloud Kubernetes only when operational scale justifies it.
+Future production enhancements are independent deployment pipelines, asymmetric JWT signing with JWKS verification, trace-tail sampling, managed telemetry storage, externally hosted public-HTTPS probes, automated cloud backup/restore evidence, and managed-cloud Kubernetes only when operational scale justifies it.
 
 This avoids premature complexity and shows an incremental migration approach suitable for real production systems.
